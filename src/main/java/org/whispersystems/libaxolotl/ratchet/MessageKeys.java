@@ -16,32 +16,32 @@
  */
 package org.whispersystems.libaxolotl.ratchet;
 
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.params.ParametersWithIV;
 
 public class MessageKeys {
 
-  private final SecretKeySpec   cipherKey;
-  private final SecretKeySpec   macKey;
-  private final IvParameterSpec iv;
-  private final int             counter;
+  private final KeyParameter     cipherKey;
+  private final KeyParameter     macKey;
+  private final ParametersWithIV iv;
+  private final int              counter;
 
-  public MessageKeys(SecretKeySpec cipherKey, SecretKeySpec macKey, IvParameterSpec iv, int counter) {
+  public MessageKeys(KeyParameter cipherKey, KeyParameter macKey, ParametersWithIV iv, int counter) {
     this.cipherKey = cipherKey;
     this.macKey    = macKey;
     this.iv        = iv;
     this.counter   = counter;
   }
 
-  public SecretKeySpec getCipherKey() {
+  public KeyParameter getCipherKey() {
     return cipherKey;
   }
 
-  public SecretKeySpec getMacKey() {
+  public KeyParameter getMacKey() {
     return macKey;
   }
 
-  public IvParameterSpec getIv() {
+  public ParametersWithIV getIv() {
     return iv;
   }
 

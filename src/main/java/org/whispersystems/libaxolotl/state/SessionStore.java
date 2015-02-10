@@ -1,6 +1,6 @@
 package org.whispersystems.libaxolotl.state;
 
-import java.util.List;
+import java.util.Vector;
 
 /**
  * The interface to the durable store of session state information
@@ -32,7 +32,7 @@ public interface SessionStore {
    * @param recipientId the recipient ID.
    * @return all known sub-devices with active sessions.
    */
-  public List<Integer> getSubDeviceSessions(long recipientId);
+  public Vector getSubDeviceSessions(long recipientId);
 
   /**
    * Commit to storage the {@link SessionRecord} for a given recipientId + deviceId tuple.

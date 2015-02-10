@@ -16,66 +16,58 @@
 
 package org.whispersystems.libaxolotl.util.guava;
 
-import static org.whispersystems.libaxolotl.util.guava.Preconditions.checkNotNull;
-
-
-
-import java.util.Collections;
-import java.util.Set;
-
 
 /**
  * Implementation of an {@link Optional} not containing a reference.
  */
 
-final class Absent extends Optional<Object> {
+final class Absent extends Optional {
   static final Absent INSTANCE = new Absent();
 
-  @Override public boolean isPresent() {
+  public boolean isPresent() {
     return false;
   }
 
-  @Override public Object get() {
+  public Object get() {
     throw new IllegalStateException("value is absent");
   }
 
-  @Override public Object or(Object defaultValue) {
-    return checkNotNull(defaultValue, "use orNull() instead of or(null)");
+  public Object or(Object defaultValue) {
+    return Preconditions.checkNotNull(defaultValue, "use orNull() instead of or(null)");
   }
 
-  @SuppressWarnings("unchecked") // safe covariant cast
-  @Override public Optional<Object> or(Optional<?> secondChoice) {
-    return (Optional) checkNotNull(secondChoice);
+  public Optional or(Optional secondChoice) {
+    return (Optional) Preconditions.checkNotNull(secondChoice);
   }
 
-  @Override public Object or(Supplier<?> supplier) {
-    return checkNotNull(supplier.get(),
+  public Object or(Supplier supplier) {
+    return Preconditions.checkNotNull(supplier.get(),
         "use orNull() instead of a Supplier that returns null");
   }
 
-  @Override public Object orNull() {
+  public Object orNull() {
     return null;
   }
 
-  @Override public Set<Object> asSet() {
-    return Collections.emptySet();
-  }
+//  @Override public Set<Object> asSet() {
+//    return Collections.emptySet();
+//  }
 
-  @Override
-  public <V> Optional<V> transform(Function<? super Object, V> function) {
-    checkNotNull(function);
-    return Optional.absent();
-  }
+//  @Override
+//  public <V> Optional<V> transform(Function<? super Object, V> function) {
+//    checkNotNull(function);
+//    return Optional.absent();
+//  }
 
-  @Override public boolean equals(Object object) {
+  public boolean equals(Object object) {
     return object == this;
   }
 
-  @Override public int hashCode() {
+  public int hashCode() {
     return 0x598df91c;
   }
 
-  @Override public String toString() {
+  public String toString() {
     return "Optional.absent()";
   }
 

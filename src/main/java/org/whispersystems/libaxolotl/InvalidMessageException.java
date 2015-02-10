@@ -16,9 +16,11 @@
  */
 package org.whispersystems.libaxolotl;
 
-import java.util.List;
+import org.whispersystems.libaxolotl.j2me.NestedException;
 
-public class InvalidMessageException extends Exception {
+import java.util.Vector;
+
+public class InvalidMessageException extends NestedException {
 
   public InvalidMessageException() {}
 
@@ -34,7 +36,7 @@ public class InvalidMessageException extends Exception {
     super(detailMessage, throwable);
   }
 
-  public InvalidMessageException(String detailMessage, List<Exception> exceptions) {
-    super(detailMessage, exceptions.get(0));
+  public InvalidMessageException(String detailMessage, Vector exceptions) {
+    super(detailMessage, (Throwable)exceptions.elementAt(0));
   }
 }

@@ -17,11 +17,13 @@
 
 package org.whispersystems.libaxolotl.ecc;
 
-public interface ECPublicKey extends Comparable<ECPublicKey> {
+public interface ECPublicKey {
 
   public static final int KEY_SIZE = 33;
 
   public byte[] serialize();
 
   public int getType();
+
+  public int compareTo(ECPublicKey other);
 }

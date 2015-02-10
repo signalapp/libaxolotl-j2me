@@ -1,6 +1,8 @@
 package org.whispersystems.libaxolotl;
 
-public class NoSessionException extends Exception {
+import org.whispersystems.libaxolotl.j2me.NestedException;
+
+public class NoSessionException extends NestedException {
   public NoSessionException(String s) {
     super(s);
   }

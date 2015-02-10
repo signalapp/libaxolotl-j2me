@@ -16,7 +16,9 @@
  */
 package org.whispersystems.libaxolotl;
 
-public class InvalidKeyException extends Exception {
+import org.whispersystems.libaxolotl.j2me.NestedException;
+
+public class InvalidKeyException extends NestedException {
 
   public InvalidKeyException() {}
 

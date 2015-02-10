@@ -1,8 +1,6 @@
 package org.whispersystems.libaxolotl.protocol;
 
 
-import com.google.protobuf.ByteString;
-
 import org.whispersystems.libaxolotl.IdentityKey;
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.InvalidMessageException;
@@ -12,9 +10,6 @@ import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
 import org.whispersystems.libaxolotl.util.ByteUtil;
 
-import java.io.IOException;
-
-import static org.whispersystems.libaxolotl.protocol.WhisperProtos.KeyExchangeMessage.Builder;
 
 public class KeyExchangeMessage {
 
@@ -48,18 +43,18 @@ public class KeyExchangeMessage {
     this.identityKey      = identityKey;
 
     byte[]  version = {ByteUtil.intsToByteHighAndLow(this.version, this.supportedVersion)};
-    Builder builder = WhisperProtos.KeyExchangeMessage
-                                   .newBuilder()
-                                   .setId((sequence << 5) | flags)
-                                   .setBaseKey(ByteString.copyFrom(baseKey.serialize()))
-                                   .setRatchetKey(ByteString.copyFrom(ratchetKey.serialize()))
-                                   .setIdentityKey(ByteString.copyFrom(identityKey.serialize()));
+
+    org.whispersystems.libaxolotl.protocol.protos.KeyExchangeMessage structure = new org.whispersystems.libaxolotl.protocol.protos.KeyExchangeMessage();
+    structure.setId((sequence << 5) | flags);
+    structure.setBasekey(baseKey.serialize());
+    structure.setRatchetkey(ratchetKey.serialize());
+    structure.setIdentitykey(identityKey.serialize());
 
     if (messageVersion >= 3) {
-      builder.setBaseKeySignature(ByteString.copyFrom(baseKeySignature));
+      structure.setBasekeysignature(baseKeySignature);
     }
 
-    this.serialized = ByteUtil.combine(version, builder.build().toByteArray());
+    this.serialized = ByteUtil.combine(version, structure.toBytes());
   }
 
   public KeyExchangeMessage(byte[] serialized)
@@ -78,11 +73,12 @@ public class KeyExchangeMessage {
         throw new InvalidVersionException("Unknown version: " + this.version);
       }
 
-      WhisperProtos.KeyExchangeMessage message = WhisperProtos.KeyExchangeMessage.parseFrom(parts[1]);
+      org.whispersystems.libaxolotl.protocol.protos.KeyExchangeMessage message =
+          org.whispersystems.libaxolotl.protocol.protos.KeyExchangeMessage.fromBytes(parts[1]);
 
-      if (!message.hasId()           || !message.hasBaseKey()     ||
-          !message.hasRatchetKey()   || !message.hasIdentityKey() ||
-          (this.version >=3 && !message.hasBaseKeySignature()))
+      if (!message.hasId()         || !message.hasBasekey()     ||
+          !message.hasRatchetkey() || !message.hasIdentitykey() ||
+          (this.version >=3 && message.getBasekeysignature() == null))
       {
         throw new InvalidMessageException("Some required fields missing!");
       }
@@ -90,12 +86,12 @@ public class KeyExchangeMessage {
       this.sequence         = message.getId() >> 5;
       this.flags            = message.getId() & 0x1f;
       this.serialized       = serialized;
-      this.baseKey          = Curve.decodePoint(message.getBaseKey().toByteArray(), 0);
-      this.baseKeySignature = message.getBaseKeySignature().toByteArray();
-      this.ratchetKey       = Curve.decodePoint(message.getRatchetKey().toByteArray(), 0);
-      this.identityKey      = new IdentityKey(message.getIdentityKey().toByteArray(), 0);
-    } catch (InvalidKeyException | IOException e) {
-      throw new InvalidMessageException(e);
+      this.baseKey          = Curve.decodePoint(message.getBasekey(), 0);
+      this.baseKeySignature = message.getBasekeysignature();
+      this.ratchetKey       = Curve.decodePoint(message.getRatchetkey(), 0);
+      this.identityKey      = new IdentityKey(message.getIdentitykey(), 0);
+    } catch (InvalidKeyException ike) {
+      throw new InvalidMessageException(ike);
     }
   }
 

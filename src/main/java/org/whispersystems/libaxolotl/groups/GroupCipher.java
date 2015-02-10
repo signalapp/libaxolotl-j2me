@@ -1,6 +1,14 @@
 package org.whispersystems.libaxolotl.groups;
 
+import org.bouncycastle.crypto.InvalidCipherTextException;
+import org.bouncycastle.crypto.engines.AESEngine;
+import org.bouncycastle.crypto.modes.CBCBlockCipher;
+import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.params.ParametersWithIV;
+import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.DuplicateMessageException;
+import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.InvalidKeyIdException;
 import org.whispersystems.libaxolotl.InvalidMessageException;
 import org.whispersystems.libaxolotl.LegacyMessageException;
@@ -11,27 +19,22 @@ import org.whispersystems.libaxolotl.groups.state.SenderKeyRecord;
 import org.whispersystems.libaxolotl.groups.state.SenderKeyState;
 import org.whispersystems.libaxolotl.groups.state.SenderKeyStore;
 import org.whispersystems.libaxolotl.protocol.SenderKeyMessage;
+import org.whispersystems.libaxolotl.j2me.AssertionError;
 
-import java.security.InvalidAlgorithmParameterException;
-import java.security.NoSuchAlgorithmException;
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
+import java.io.IOException;
 
 public class GroupCipher {
 
   static final Object LOCK = new Object();
 
-  private final SenderKeyStore senderKeyStore;
-  private final String         senderKeyId;
+  private final SecureRandomProvider secureRandomProvider;
+  private final SenderKeyStore       senderKeyStore;
+  private final String               senderKeyId;
 
-  public GroupCipher(SenderKeyStore senderKeyStore, String senderKeyId) {
-    this.senderKeyStore = senderKeyStore;
-    this.senderKeyId    = senderKeyId;
+  public GroupCipher(SecureRandomProvider secureRandomProvider, SenderKeyStore senderKeyStore, String senderKeyId) {
+    this.secureRandomProvider = secureRandomProvider;
+    this.senderKeyStore       = senderKeyStore;
+    this.senderKeyId          = senderKeyId;
   }
 
   public byte[] encrypt(byte[] paddedPlaintext) throws NoSessionException {
@@ -42,7 +45,8 @@ public class GroupCipher {
         SenderMessageKey senderKey      = senderKeyState.getSenderChainKey().getSenderMessageKey();
         byte[]           ciphertext     = getCipherText(senderKey.getIv(), senderKey.getCipherKey(), paddedPlaintext);
 
-        SenderKeyMessage senderKeyMessage = new SenderKeyMessage(senderKeyState.getKeyId(),
+        SenderKeyMessage senderKeyMessage = new SenderKeyMessage(secureRandomProvider,
+                                                                 senderKeyState.getKeyId(),
                                                                  senderKey.getIteration(),
                                                                  ciphertext,
                                                                  senderKeyState.getSigningKeyPrivate());
@@ -76,8 +80,10 @@ public class GroupCipher {
         senderKeyStore.storeSenderKey(senderKeyId, record);
 
         return plaintext;
-      } catch (org.whispersystems.libaxolotl.InvalidKeyException | InvalidKeyIdException e) {
-        throw new InvalidMessageException(e);
+      } catch (InvalidKeyException ike) {
+        throw new InvalidMessageException(ike);
+      } catch (InvalidKeyIdException ikie) {
+        throw new InvalidMessageException(ikie);
       }
     }
   }
@@ -113,33 +119,41 @@ public class GroupCipher {
       throws InvalidMessageException
   {
     try {
-      IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
-      Cipher          cipher          = Cipher.getInstance("AES/CBC/PKCS5Padding");
-
-      cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), ivParameterSpec);
-
-      return cipher.doFinal(ciphertext);
-    } catch (NoSuchAlgorithmException | NoSuchPaddingException | java.security.InvalidKeyException |
-             InvalidAlgorithmParameterException e)
-    {
-      throw new AssertionError(e);
-    } catch (IllegalBlockSizeException | BadPaddingException e) {
+      return cipher(false, iv, key, ciphertext);
+    } catch (InvalidCipherTextException e) {
+      throw new InvalidMessageException(e);
+    } catch (IOException e) {
       throw new InvalidMessageException(e);
     }
   }
 
   private byte[] getCipherText(byte[] iv, byte[] key, byte[] plaintext) {
     try {
-      IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
-      Cipher          cipher          = Cipher.getInstance("AES/CBC/PKCS5Padding");
-
-      cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), ivParameterSpec);
-
-      return cipher.doFinal(plaintext);
-    } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidAlgorithmParameterException |
-             IllegalBlockSizeException | BadPaddingException | java.security.InvalidKeyException e)
-    {
+      return cipher(true, iv, key, plaintext);
+    } catch (InvalidCipherTextException e) {
       throw new AssertionError(e);
+    } catch (IOException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  private byte[] cipher(boolean encrypt, byte[] iv, byte[] key, byte[] input)
+      throws InvalidCipherTextException, IOException
+  {
+    KeyParameter              keyParameter = new KeyParameter(key, 0, key.length);
+    PaddedBufferedBlockCipher cipher       = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+    cipher.init(encrypt, new ParametersWithIV(keyParameter, iv, 0, iv.length));
+
+    byte[] buffer    = new byte[cipher.getOutputSize(input.length)];
+    int    processed = cipher.processBytes(input, 0, input.length, buffer, 0);
+    int    finished  = cipher.doFinal(buffer, 0);
+
+    if (processed + finished < buffer.length) {
+      byte[] trimmed = new byte[processed + finished];
+      System.arraycopy(buffer, 0, trimmed, 0, trimmed.length);
+      return trimmed;
+    } else {
+      return buffer;
     }
   }
 

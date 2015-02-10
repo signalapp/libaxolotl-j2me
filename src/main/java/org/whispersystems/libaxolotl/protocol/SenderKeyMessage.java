@@ -1,17 +1,16 @@
 package org.whispersystems.libaxolotl.protocol;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-
+import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.InvalidMessageException;
 import org.whispersystems.libaxolotl.LegacyMessageException;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECPrivateKey;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
+import org.whispersystems.libaxolotl.j2me.AssertionError;
 import org.whispersystems.libaxolotl.util.ByteUtil;
+import org.whispersystems.libaxolotl.j2me.ParseException;
 
-import java.text.ParseException;
 
 public class SenderKeyMessage implements CiphertextMessage {
 
@@ -38,34 +37,39 @@ public class SenderKeyMessage implements CiphertextMessage {
         throw new InvalidMessageException("Unknown version: " + ByteUtil.highBitsToInt(version));
       }
 
-      WhisperProtos.SenderKeyMessage senderKeyMessage = WhisperProtos.SenderKeyMessage.parseFrom(message);
+      org.whispersystems.libaxolotl.protocol.protos.SenderKeyMessage structure =
+          org.whispersystems.libaxolotl.protocol.protos.SenderKeyMessage.fromBytes(message);
 
-      if (!senderKeyMessage.hasId() ||
-          !senderKeyMessage.hasIteration() ||
-          !senderKeyMessage.hasCiphertext())
+      if (!structure.hasId() ||
+          !structure.hasIteration() ||
+          !structure.hasCiphertext())
       {
         throw new InvalidMessageException("Incomplete message.");
       }
 
       this.serialized     = serialized;
       this.messageVersion = ByteUtil.highBitsToInt(version);
-      this.keyId          = senderKeyMessage.getId();
-      this.iteration      = senderKeyMessage.getIteration();
-      this.ciphertext     = senderKeyMessage.getCiphertext().toByteArray();
-    } catch (InvalidProtocolBufferException | ParseException e) {
+      this.keyId          = structure.getId();
+      this.iteration      = structure.getIteration();
+      this.ciphertext     = structure.getCiphertext();
+    } catch (ParseException e) {
       throw new InvalidMessageException(e);
     }
   }
 
-  public SenderKeyMessage(int keyId, int iteration, byte[] ciphertext, ECPrivateKey signatureKey) {
-    byte[] version = {ByteUtil.intsToByteHighAndLow(CURRENT_VERSION, CURRENT_VERSION)};
-    byte[] message = WhisperProtos.SenderKeyMessage.newBuilder()
-                                                   .setId(keyId)
-                                                   .setIteration(iteration)
-                                                   .setCiphertext(ByteString.copyFrom(ciphertext))
-                                                   .build().toByteArray();
+  public SenderKeyMessage(SecureRandomProvider secureRandom,
+                          int keyId, int iteration, byte[] ciphertext, ECPrivateKey signatureKey)
+  {
+    org.whispersystems.libaxolotl.protocol.protos.SenderKeyMessage structure =
+        new org.whispersystems.libaxolotl.protocol.protos.SenderKeyMessage();
 
-    byte[] signature = getSignature(signatureKey, ByteUtil.combine(version, message));
+    structure.setId(keyId);
+    structure.setIteration(iteration);
+    structure.setCiphertext(ciphertext);
+
+    byte[] version   = {ByteUtil.intsToByteHighAndLow(CURRENT_VERSION, CURRENT_VERSION)};
+    byte[] message   = structure.toBytes();
+    byte[] signature = getSignature(secureRandom, signatureKey, ByteUtil.combine(version, message));
 
     this.serialized       = ByteUtil.combine(version, message, signature);
     this.messageVersion   = CURRENT_VERSION;
@@ -101,20 +105,20 @@ public class SenderKeyMessage implements CiphertextMessage {
     }
   }
 
-  private byte[] getSignature(ECPrivateKey signatureKey, byte[] serialized) {
+  private byte[] getSignature(SecureRandomProvider secureRandom, ECPrivateKey signatureKey, byte[] serialized) {
     try {
-      return Curve.calculateSignature(signatureKey, serialized);
+      return Curve.calculateSignature(secureRandom, signatureKey, serialized);
     } catch (InvalidKeyException e) {
       throw new AssertionError(e);
     }
   }
 
-  @Override
+//  @Override
   public byte[] serialize() {
     return serialized;
   }
 
-  @Override
+//  @Override
   public int getType() {
     return CiphertextMessage.SENDERKEY_TYPE;
   }

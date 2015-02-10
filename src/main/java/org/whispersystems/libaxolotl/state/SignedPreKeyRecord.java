@@ -1,35 +1,31 @@
 package org.whispersystems.libaxolotl.state;
 
-import com.google.protobuf.ByteString;
-
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.ecc.ECPrivateKey;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
+import org.whispersystems.libaxolotl.state.protos.SignedPreKeyRecordStructure;
+import org.whispersystems.libaxolotl.j2me.AssertionError;
 
 import java.io.IOException;
 
-import static org.whispersystems.libaxolotl.state.StorageProtos.SignedPreKeyRecordStructure;
 
 public class SignedPreKeyRecord {
 
   private SignedPreKeyRecordStructure structure;
 
   public SignedPreKeyRecord(int id, long timestamp, ECKeyPair keyPair, byte[] signature) {
-    this.structure = SignedPreKeyRecordStructure.newBuilder()
-                                                .setId(id)
-                                                .setPublicKey(ByteString.copyFrom(keyPair.getPublicKey()
-                                                                                         .serialize()))
-                                                .setPrivateKey(ByteString.copyFrom(keyPair.getPrivateKey()
-                                                                                          .serialize()))
-                                                .setSignature(ByteString.copyFrom(signature))
-                                                .setTimestamp(timestamp)
-                                                .build();
+    this.structure = new SignedPreKeyRecordStructure();
+    structure.setId(id);
+    structure.setPublickey(keyPair.getPublicKey().serialize());
+    structure.setPrivatekey(keyPair.getPrivateKey().serialize());
+    structure.setSignature(signature);
+    structure.setTimestamp(timestamp);
   }
 
   public SignedPreKeyRecord(byte[] serialized) throws IOException {
-    this.structure = SignedPreKeyRecordStructure.parseFrom(serialized);
+    this.structure = SignedPreKeyRecordStructure.fromBytes(serialized);
   }
 
   public int getId() {
@@ -42,8 +38,8 @@ public class SignedPreKeyRecord {
 
   public ECKeyPair getKeyPair() {
     try {
-      ECPublicKey publicKey = Curve.decodePoint(this.structure.getPublicKey().toByteArray(), 0);
-      ECPrivateKey privateKey = Curve.decodePrivatePoint(this.structure.getPrivateKey().toByteArray());
+      ECPublicKey publicKey = Curve.decodePoint(this.structure.getPublickey(), 0);
+      ECPrivateKey privateKey = Curve.decodePrivatePoint(this.structure.getPrivatekey());
 
       return new ECKeyPair(publicKey, privateKey);
     } catch (InvalidKeyException e) {
@@ -52,10 +48,10 @@ public class SignedPreKeyRecord {
   }
 
   public byte[] getSignature() {
-    return this.structure.getSignature().toByteArray();
+    return this.structure.getSignature();
   }
 
   public byte[] serialize() {
-    return this.structure.toByteArray();
+    return this.structure.toBytes();
   }
 }

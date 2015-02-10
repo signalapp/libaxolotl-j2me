@@ -3,40 +3,40 @@ package org.whispersystems.libaxolotl.groups.state;
 import org.whispersystems.libaxolotl.InvalidKeyIdException;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
-import org.whispersystems.libaxolotl.state.StorageProtos;
+import org.whispersystems.libaxolotl.state.protos.SenderKeyRecordStructure;
+import org.whispersystems.libaxolotl.state.protos.SenderKeyStateStructure;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-
-import static org.whispersystems.libaxolotl.state.StorageProtos.SenderKeyRecordStructure;
+import java.util.Vector;
 
 public class SenderKeyRecord {
 
-  private List<SenderKeyState> senderKeyStates = new LinkedList<>();
+  // SenderKeyState
+  private Vector senderKeyStates = new Vector();
 
   public SenderKeyRecord() {}
 
   public SenderKeyRecord(byte[] serialized) throws IOException {
-    SenderKeyRecordStructure senderKeyRecordStructure = SenderKeyRecordStructure.parseFrom(serialized);
+    SenderKeyRecordStructure senderKeyRecordStructure = SenderKeyRecordStructure.fromBytes(serialized);
+    Vector                   senderKeyStates          = senderKeyRecordStructure.getSenderkeystatesVector();
 
-    for (StorageProtos.SenderKeyStateStructure structure : senderKeyRecordStructure.getSenderKeyStatesList()) {
-      this.senderKeyStates.add(new SenderKeyState(structure));
+    for (int i=0;i<senderKeyStates.size();i++) {
+      this.senderKeyStates.addElement(new SenderKeyState((SenderKeyStateStructure)senderKeyStates.elementAt(i)));
     }
   }
 
   public SenderKeyState getSenderKeyState() throws InvalidKeyIdException {
     if (!senderKeyStates.isEmpty()) {
-      return senderKeyStates.get(0);
+      return (SenderKeyState)senderKeyStates.elementAt(0);
     } else {
       throw new InvalidKeyIdException("No key state in record!");
     }
   }
 
   public SenderKeyState getSenderKeyState(int keyId) throws InvalidKeyIdException {
-    for (SenderKeyState state : senderKeyStates) {
-      if (state.getKeyId() == keyId) {
-        return state;
+    for (int i=0;i<senderKeyStates.size();i++) {
+      if (((SenderKeyState)senderKeyStates.elementAt(i)).getKeyId() == keyId) {
+        return (SenderKeyState)senderKeyStates.elementAt(i);
       }
     }
 
@@ -44,21 +44,22 @@ public class SenderKeyRecord {
   }
 
   public void addSenderKeyState(int id, int iteration, byte[] chainKey, ECPublicKey signatureKey) {
-    senderKeyStates.add(new SenderKeyState(id, iteration, chainKey, signatureKey));
+    senderKeyStates.addElement(new SenderKeyState(id, iteration, chainKey, signatureKey));
   }
 
   public void setSenderKeyState(int id, int iteration, byte[] chainKey, ECKeyPair signatureKey) {
-    senderKeyStates.clear();
-    senderKeyStates.add(new SenderKeyState(id, iteration, chainKey, signatureKey));
+    senderKeyStates.removeAllElements();
+    senderKeyStates.addElement(new SenderKeyState(id, iteration, chainKey, signatureKey));
   }
 
   public byte[] serialize() {
-    SenderKeyRecordStructure.Builder recordStructure = SenderKeyRecordStructure.newBuilder();
+    SenderKeyRecordStructure recordStructure = new SenderKeyRecordStructure();
 
-    for (SenderKeyState senderKeyState : senderKeyStates) {
-      recordStructure.addSenderKeyStates(senderKeyState.getStructure());
+    for (int i=0;i<senderKeyStates.size();i++) {
+      SenderKeyState state = (SenderKeyState)senderKeyStates.elementAt(i);
+      recordStructure.addSenderkeystates(state.getStructure());
     }
 
-    return recordStructure.build().toByteArray();
+    return recordStructure.toBytes();
   }
 }

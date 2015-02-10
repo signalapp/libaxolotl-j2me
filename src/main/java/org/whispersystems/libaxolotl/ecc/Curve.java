@@ -18,21 +18,19 @@ package org.whispersystems.libaxolotl.ecc;
 
 import org.whispersystems.curve25519.Curve25519;
 import org.whispersystems.curve25519.Curve25519KeyPair;
-import org.whispersystems.curve25519.NoSuchProviderException;
+import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.InvalidKeyException;
-
-import static org.whispersystems.curve25519.Curve25519.BEST;
 
 public class Curve {
 
   public  static final int DJB_TYPE   = 0x05;
 
   public static boolean isNative() {
-    return Curve25519.getInstance(BEST).isNative();
+    return Curve25519.getInstance(Curve25519.J2ME).isNative();
   }
 
-  public static ECKeyPair generateKeyPair() {
-    Curve25519KeyPair keyPair = Curve25519.getInstance(BEST).generateKeyPair();
+  public static ECKeyPair generateKeyPair(SecureRandomProvider secureRandom) {
+    Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.J2ME, secureRandom).generateKeyPair();
 
     return new ECKeyPair(new DjbECPublicKey(keyPair.getPublicKey()),
                          new DjbECPrivateKey(keyPair.getPrivateKey()));
@@ -65,7 +63,7 @@ public class Curve {
     }
 
     if (publicKey.getType() == DJB_TYPE) {
-      return Curve25519.getInstance(BEST)
+      return Curve25519.getInstance(Curve25519.J2ME)
                        .calculateAgreement(((DjbECPublicKey) publicKey).getPublicKey(),
                                            ((DjbECPrivateKey) privateKey).getPrivateKey());
     } else {
@@ -77,18 +75,19 @@ public class Curve {
       throws InvalidKeyException
   {
     if (signingKey.getType() == DJB_TYPE) {
-      return Curve25519.getInstance(BEST)
+      return Curve25519.getInstance(Curve25519.J2ME)
                        .verifySignature(((DjbECPublicKey) signingKey).getPublicKey(), message, signature);
     } else {
       throw new InvalidKeyException("Unknown type: " + signingKey.getType());
     }
   }
 
-  public static byte[] calculateSignature(ECPrivateKey signingKey, byte[] message)
+  public static byte[] calculateSignature(SecureRandomProvider secureRandom,
+                                          ECPrivateKey signingKey, byte[] message)
       throws InvalidKeyException
   {
     if (signingKey.getType() == DJB_TYPE) {
-      return Curve25519.getInstance(BEST)
+      return Curve25519.getInstance(Curve25519.J2ME, secureRandom)
                        .calculateSignature(((DjbECPrivateKey) signingKey).getPrivateKey(), message);
     } else {
       throw new InvalidKeyException("Unknown type: " + signingKey.getType());

@@ -16,19 +16,34 @@
  */
 package org.whispersystems.libaxolotl.util;
 
+import org.whispersystems.libaxolotl.j2me.AssertionError;
+import org.whispersystems.libaxolotl.j2me.ParseException;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.text.ParseException;
 
 public class ByteUtil {
 
-  public static byte[] combine(byte[]... elements) {
+  public static byte[] combine(byte[] first, byte[] second) {
     try {
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-      for (byte[] element : elements) {
-        baos.write(element);
-      }
+      baos.write(first);
+      baos.write(second);
+
+      return baos.toByteArray();
+    } catch (IOException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  public static byte[] combine(byte[] first, byte[] second, byte[] third) {
+    try {
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+      baos.write(first);
+      baos.write(second);
+      baos.write(third);
 
       return baos.toByteArray();
     } catch (IOException e) {
@@ -54,7 +69,7 @@ public class ByteUtil {
     if (input == null || firstLength < 0 || secondLength < 0 || thirdLength < 0 ||
         input.length < firstLength + secondLength + thirdLength)
     {
-      throw new ParseException("Input too small: " + (input == null ? null : Hex.toString(input)), 0);
+      throw new ParseException("Input too small: " + (input == null ? null : Hex.toString(input)));
     }
 
     byte[][] parts = new byte[3][];

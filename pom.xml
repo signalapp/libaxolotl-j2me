@@ -35,11 +35,38 @@
         <developerConnection>scm:git:https://github.com/WhisperSystems/libaxolotl-j2me.git</developerConnection>
     </scm>
 
+    <repositories>
+        <repository>
+            <id>libs</id>
+            <url>file://${basedir}/libs</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
             <version>2.5.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.whispersystems</groupId>
+            <artifactId>curve25519-j2me</artifactId>
+            <version>0.2.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk12</artifactId>
+            <version>130</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ponderingpanda.protobuf</groupId>
+            <artifactId>protobuf-mobile</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>3.7</version>
         </dependency>
     </dependencies>
 

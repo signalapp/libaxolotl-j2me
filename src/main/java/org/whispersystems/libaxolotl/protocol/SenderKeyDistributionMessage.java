@@ -1,7 +1,5 @@
 package org.whispersystems.libaxolotl.protocol;
 
-import com.google.protobuf.ByteString;
-
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
 import org.whispersystems.libaxolotl.util.ByteUtil;
 
@@ -20,20 +18,24 @@ public class SenderKeyDistributionMessage implements CiphertextMessage {
     this.iteration    = iteration;
     this.chainKey     = chainKey;
     this.signatureKey = signatureKey;
-    this.serialized   = WhisperProtos.SenderKeyDistributionMessage.newBuilder()
-                                                                  .setId(id)
-                                                                  .setIteration(iteration)
-                                                                  .setChainKey(ByteString.copyFrom(chainKey))
-                                                                  .setSigningKey(ByteString.copyFrom(signatureKey.serialize()))
-                                                                  .build().toByteArray();
+
+    org.whispersystems.libaxolotl.protocol.protos.SenderKeyDistributionMessage structure =
+        new org.whispersystems.libaxolotl.protocol.protos.SenderKeyDistributionMessage();
+
+    structure.setId(id);;
+    structure.setIteration(iteration);
+    structure.setChainkey(chainKey);
+    structure.setSigningkey(signatureKey.serialize());
+
+    this.serialized = structure.toBytes();
   }
 
-  @Override
+//  @Override
   public byte[] serialize() {
     return serialized;
   }
 
-  @Override
+//  @Override
   public int getType() {
     return SENDERKEY_DISTRIBUTION_TYPE;
   }

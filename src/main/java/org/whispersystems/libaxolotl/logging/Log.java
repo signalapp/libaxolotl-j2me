@@ -1,8 +1,6 @@
 package org.whispersystems.libaxolotl.logging;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.net.UnknownHostException;
+import org.whispersystems.libaxolotl.j2me.NestedException;
 
 public class Log {
 
@@ -59,19 +57,27 @@ public class Log {
 
     // This is to reduce the amount of log spew that apps do in the non-error
     // condition of the network being unavailable.
-    Throwable t = tr;
-    while (t != null) {
-      if (t instanceof UnknownHostException) {
-        return "";
-      }
-      t = t.getCause();
+//    Throwable t = tr;
+//    while (t != null) {
+//      if (t instanceof UnknownHostException) {
+//        return "";
+//      }
+//      t = t.getCause();
+//    }
+
+    String name = tr.toString();
+
+    if (tr instanceof NestedException && ((NestedException)tr).getNested() != null) {
+      name += "\nCaused by: " + ((NestedException)tr).getNested().toString();
     }
 
-    StringWriter sw = new StringWriter();
-    PrintWriter pw = new PrintWriter(sw);
-    tr.printStackTrace(pw);
-    pw.flush();
-    return sw.toString();
+    return name;
+//    StringWriter sw = new StringWriter();
+//    PrintWriter pw = new PrintWriter(sw);
+//
+//    tr.printStackTrace(pw);
+//    pw.flush();
+//    return sw.toString();
   }
 
   private static void log(int priority, String tag, String msg) {

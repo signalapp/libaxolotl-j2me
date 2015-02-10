@@ -16,9 +16,9 @@
  */
 package org.whispersystems.libaxolotl.protocol;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-
+import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.macs.HMac;
+import org.bouncycastle.crypto.params.KeyParameter;
 import org.whispersystems.libaxolotl.IdentityKey;
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.InvalidMessageException;
@@ -26,13 +26,8 @@ import org.whispersystems.libaxolotl.LegacyMessageException;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
 import org.whispersystems.libaxolotl.util.ByteUtil;
-
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.text.ParseException;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
+import org.whispersystems.libaxolotl.j2me.MessageDigest;
+import org.whispersystems.libaxolotl.j2me.ParseException;
 
 public class WhisperMessage implements CiphertextMessage {
 
@@ -60,39 +55,44 @@ public class WhisperMessage implements CiphertextMessage {
         throw new InvalidMessageException("Unknown version: " + ByteUtil.highBitsToInt(version));
       }
 
-      WhisperProtos.WhisperMessage whisperMessage = WhisperProtos.WhisperMessage.parseFrom(message);
+      org.whispersystems.libaxolotl.protocol.protos.WhisperMessage structure =
+          org.whispersystems.libaxolotl.protocol.protos.WhisperMessage.fromBytes(message);
 
-      if (!whisperMessage.hasCiphertext() ||
-          !whisperMessage.hasCounter() ||
-          !whisperMessage.hasRatchetKey())
+      if (!structure.hasCiphertext() ||
+          !structure.hasCounter() ||
+          !structure.hasRatchetkey())
       {
         throw new InvalidMessageException("Incomplete message.");
       }
 
       this.serialized       = serialized;
-      this.senderRatchetKey = Curve.decodePoint(whisperMessage.getRatchetKey().toByteArray(), 0);
+      this.senderRatchetKey = Curve.decodePoint(structure.getRatchetkey(), 0);
       this.messageVersion   = ByteUtil.highBitsToInt(version);
-      this.counter          = whisperMessage.getCounter();
-      this.previousCounter  = whisperMessage.getPreviousCounter();
-      this.ciphertext       = whisperMessage.getCiphertext().toByteArray();
-    } catch (InvalidProtocolBufferException | InvalidKeyException | ParseException e) {
+      this.counter          = structure.getCounter();
+      this.previousCounter  = structure.getPreviouscounter();
+      this.ciphertext       = structure.getCiphertext();
+    } catch (InvalidKeyException ike) {
+      throw new InvalidMessageException(ike);
+    } catch (ParseException e) {
       throw new InvalidMessageException(e);
     }
   }
 
-  public WhisperMessage(int messageVersion, SecretKeySpec macKey, ECPublicKey senderRatchetKey,
+  public WhisperMessage(int messageVersion, KeyParameter macKey, ECPublicKey senderRatchetKey,
                         int counter, int previousCounter, byte[] ciphertext,
                         IdentityKey senderIdentityKey,
                         IdentityKey receiverIdentityKey)
   {
-    byte[] version = {ByteUtil.intsToByteHighAndLow(messageVersion, CURRENT_VERSION)};
-    byte[] message = WhisperProtos.WhisperMessage.newBuilder()
-                                   .setRatchetKey(ByteString.copyFrom(senderRatchetKey.serialize()))
-                                   .setCounter(counter)
-                                   .setPreviousCounter(previousCounter)
-                                   .setCiphertext(ByteString.copyFrom(ciphertext))
-                                   .build().toByteArray();
+    org.whispersystems.libaxolotl.protocol.protos.WhisperMessage structure =
+        new org.whispersystems.libaxolotl.protocol.protos.WhisperMessage();
 
+    structure.setRatchetkey(senderRatchetKey.serialize());
+    structure.setCounter(counter);
+    structure.setPreviouscounter(previousCounter);
+    structure.setCiphertext(ciphertext);
+
+    byte[] version = {ByteUtil.intsToByteHighAndLow(messageVersion, CURRENT_VERSION)};
+    byte[] message = structure.toBytes();
     byte[] mac     = getMac(messageVersion, senderIdentityKey, receiverIdentityKey, macKey,
                             ByteUtil.combine(version, message));
 
@@ -121,7 +121,7 @@ public class WhisperMessage implements CiphertextMessage {
   }
 
   public void verifyMac(int messageVersion, IdentityKey senderIdentityKey,
-                        IdentityKey receiverIdentityKey, SecretKeySpec macKey)
+                        IdentityKey receiverIdentityKey, KeyParameter macKey)
       throws InvalidMessageException
   {
     byte[][] parts    = ByteUtil.split(serialized, serialized.length - MAC_LENGTH, MAC_LENGTH);
@@ -136,30 +136,32 @@ public class WhisperMessage implements CiphertextMessage {
   private byte[] getMac(int messageVersion,
                         IdentityKey senderIdentityKey,
                         IdentityKey receiverIdentityKey,
-                        SecretKeySpec macKey, byte[] serialized)
+                        KeyParameter macKey, byte[] serialized)
   {
-    try {
-      Mac mac = Mac.getInstance("HmacSHA256");
-      mac.init(macKey);
+    HMac   mac    = new HMac(new SHA256Digest());
+    byte[] output = new byte[mac.getMacSize()];
+    mac.init(macKey);
 
-      if (messageVersion >= 3) {
-        mac.update(senderIdentityKey.getPublicKey().serialize());
-        mac.update(receiverIdentityKey.getPublicKey().serialize());
-      }
+    if (messageVersion >= 3) {
+      byte[] senderIdentity = senderIdentityKey.getPublicKey().serialize();
+      byte[] receiverIdentity = receiverIdentityKey.getPublicKey().serialize();
 
-      byte[] fullMac = mac.doFinal(serialized);
-      return ByteUtil.trim(fullMac, MAC_LENGTH);
-    } catch (NoSuchAlgorithmException | java.security.InvalidKeyException e) {
-      throw new AssertionError(e);
+      mac.update(senderIdentity, 0, senderIdentity.length);
+      mac.update(receiverIdentity, 0, receiverIdentity.length);
     }
+
+    mac.update(serialized, 0, serialized.length);
+    mac.doFinal(output, 0);
+
+    return ByteUtil.trim(output, MAC_LENGTH);
   }
 
-  @Override
+//  @Override
   public byte[] serialize() {
     return serialized;
   }
 
-  @Override
+//  @Override
   public int getType() {
     return CiphertextMessage.WHISPER_TYPE;
   }

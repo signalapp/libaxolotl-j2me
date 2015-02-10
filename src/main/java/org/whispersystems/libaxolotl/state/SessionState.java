@@ -18,8 +18,8 @@
 package org.whispersystems.libaxolotl.state;
 
 
-import com.google.protobuf.ByteString;
-
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.whispersystems.libaxolotl.IdentityKey;
 import org.whispersystems.libaxolotl.IdentityKeyPair;
 import org.whispersystems.libaxolotl.InvalidKeyException;
@@ -32,27 +32,19 @@ import org.whispersystems.libaxolotl.logging.Log;
 import org.whispersystems.libaxolotl.ratchet.ChainKey;
 import org.whispersystems.libaxolotl.ratchet.MessageKeys;
 import org.whispersystems.libaxolotl.ratchet.RootKey;
-import org.whispersystems.libaxolotl.state.StorageProtos.SessionStructure.Chain;
-import org.whispersystems.libaxolotl.state.StorageProtos.SessionStructure.PendingKeyExchange;
-import org.whispersystems.libaxolotl.state.StorageProtos.SessionStructure.PendingPreKey;
+import org.whispersystems.libaxolotl.state.protos.SessionStructure;
+import org.whispersystems.libaxolotl.j2me.AssertionError;
 import org.whispersystems.libaxolotl.util.Pair;
 import org.whispersystems.libaxolotl.util.guava.Optional;
 
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-
-import static org.whispersystems.libaxolotl.state.StorageProtos.SessionStructure;
+import java.util.Vector;
 
 public class SessionState {
 
   private SessionStructure sessionStructure;
 
   public SessionState() {
-    this.sessionStructure = SessionStructure.newBuilder().build();
+    this.sessionStructure = new SessionStructure();
   }
 
   public SessionState(SessionStructure sessionStructure) {
@@ -60,7 +52,7 @@ public class SessionState {
   }
 
   public SessionState(SessionState copy) {
-    this.sessionStructure = copy.sessionStructure.toBuilder().build();
+    this.sessionStructure = SessionStructure.fromBytes(copy.sessionStructure.toBytes());
   }
 
   public SessionStructure getStructure() {
@@ -68,47 +60,39 @@ public class SessionState {
   }
 
   public byte[] getAliceBaseKey() {
-    return this.sessionStructure.getAliceBaseKey().toByteArray();
+    return this.sessionStructure.getAlicebasekey();
   }
 
   public void setAliceBaseKey(byte[] aliceBaseKey) {
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setAliceBaseKey(ByteString.copyFrom(aliceBaseKey))
-                                                 .build();
+    this.sessionStructure.setAlicebasekey(aliceBaseKey);
   }
 
   public void setSessionVersion(int version) {
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setSessionVersion(version)
-                                                 .build();
+    this.sessionStructure.setSessionversion(version);;
   }
 
   public int getSessionVersion() {
-    int sessionVersion = this.sessionStructure.getSessionVersion();
+    int sessionVersion = this.sessionStructure.getSessionversion();
 
     if (sessionVersion == 0) return 2;
     else                     return sessionVersion;
   }
 
   public void setRemoteIdentityKey(IdentityKey identityKey) {
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setRemoteIdentityPublic(ByteString.copyFrom(identityKey.serialize()))
-                                                 .build();
+    this.sessionStructure.setRemoteidentitypublic(identityKey.serialize());
   }
 
   public void setLocalIdentityKey(IdentityKey identityKey) {
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setLocalIdentityPublic(ByteString.copyFrom(identityKey.serialize()))
-                                                 .build();
+    this.sessionStructure.setLocalidentitypublic(identityKey.serialize());
   }
 
   public IdentityKey getRemoteIdentityKey() {
     try {
-      if (!this.sessionStructure.hasRemoteIdentityPublic()) {
+      if (this.sessionStructure.getRemoteidentitypublic() == null) {
         return null;
       }
 
-      return new IdentityKey(this.sessionStructure.getRemoteIdentityPublic().toByteArray(), 0);
+      return new IdentityKey(this.sessionStructure.getRemoteidentitypublic(), 0);
     } catch (InvalidKeyException e) {
       Log.w("SessionRecordV2", e);
       return null;
@@ -117,36 +101,32 @@ public class SessionState {
 
   public IdentityKey getLocalIdentityKey() {
     try {
-      return new IdentityKey(this.sessionStructure.getLocalIdentityPublic().toByteArray(), 0);
+      return new IdentityKey(this.sessionStructure.getLocalidentitypublic(), 0);
     } catch (InvalidKeyException e) {
       throw new AssertionError(e);
     }
   }
 
   public int getPreviousCounter() {
-    return sessionStructure.getPreviousCounter();
+    return sessionStructure.getPreviouscounter();
   }
 
   public void setPreviousCounter(int previousCounter) {
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setPreviousCounter(previousCounter)
-                                                 .build();
+    this.sessionStructure.setPreviouscounter(previousCounter);
   }
 
   public RootKey getRootKey() {
     return new RootKey(HKDF.createFor(getSessionVersion()),
-                       this.sessionStructure.getRootKey().toByteArray());
+                       this.sessionStructure.getRootkey());
   }
 
   public void setRootKey(RootKey rootKey) {
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setRootKey(ByteString.copyFrom(rootKey.getKeyBytes()))
-                                                 .build();
+    this.sessionStructure.setRootkey(rootKey.getKeyBytes());
   }
 
   public ECPublicKey getSenderRatchetKey() {
     try {
-      return Curve.decodePoint(sessionStructure.getSenderChain().getSenderRatchetKey().toByteArray(), 0);
+      return Curve.decodePoint(sessionStructure.getSenderchain().getSenderratchetkey(), 0);
     } catch (InvalidKeyException e) {
       throw new AssertionError(e);
     }
@@ -154,9 +134,8 @@ public class SessionState {
 
   public ECKeyPair getSenderRatchetKeyPair() {
     ECPublicKey  publicKey  = getSenderRatchetKey();
-    ECPrivateKey privateKey = Curve.decodePrivatePoint(sessionStructure.getSenderChain()
-                                                                       .getSenderRatchetKeyPrivate()
-                                                                       .toByteArray());
+    ECPrivateKey privateKey = Curve.decodePrivatePoint(sessionStructure.getSenderchain()
+                                                                       .getSenderratchetkeyprivate());
 
     return new ECKeyPair(publicKey, privateKey);
   }
@@ -166,19 +145,21 @@ public class SessionState {
   }
 
   public boolean hasSenderChain() {
-    return sessionStructure.hasSenderChain();
+    return sessionStructure.hasSenderchain();
   }
 
-  private Pair<Chain,Integer> getReceiverChain(ECPublicKey senderEphemeral) {
-    List<Chain> receiverChains = sessionStructure.getReceiverChainsList();
-    int         index          = 0;
+  private Pair getReceiverChain(ECPublicKey senderEphemeral) {
+    Vector receiverChains = sessionStructure.getReceiverchainsVector();
+    int    index          = 0;
 
-    for (Chain receiverChain : receiverChains) {
+    for (int i=0;i<receiverChains.size();i++) {
+      SessionStructure.Chain receiverChain = (SessionStructure.Chain)receiverChains.elementAt(i);
+
       try {
-        ECPublicKey chainSenderRatchetKey = Curve.decodePoint(receiverChain.getSenderRatchetKey().toByteArray(), 0);
+        ECPublicKey chainSenderRatchetKey = Curve.decodePoint(receiverChain.getSenderratchetkey(), 0);
 
         if (chainSenderRatchetKey.equals(senderEphemeral)) {
-          return new Pair<>(receiverChain,index);
+          return new Pair(receiverChain,new Integer(index));
         }
       } catch (InvalidKeyException e) {
         Log.w("SessionRecordV2", e);
@@ -191,83 +172,75 @@ public class SessionState {
   }
 
   public ChainKey getReceiverChainKey(ECPublicKey senderEphemeral) {
-    Pair<Chain,Integer> receiverChainAndIndex = getReceiverChain(senderEphemeral);
-    Chain               receiverChain         = receiverChainAndIndex.first();
+    Pair                   receiverChainAndIndex = getReceiverChain(senderEphemeral);
+    SessionStructure.Chain receiverChain         = (SessionStructure.Chain) receiverChainAndIndex.first();
 
     if (receiverChain == null) {
       return null;
     } else {
       return new ChainKey(HKDF.createFor(getSessionVersion()),
-                          receiverChain.getChainKey().getKey().toByteArray(),
-                          receiverChain.getChainKey().getIndex());
+                          receiverChain.getChainkey().getKey(),
+                          receiverChain.getChainkey().getIndex());
     }
   }
 
   public void addReceiverChain(ECPublicKey senderRatchetKey, ChainKey chainKey) {
-    Chain.ChainKey chainKeyStructure = Chain.ChainKey.newBuilder()
-                                                     .setKey(ByteString.copyFrom(chainKey.getKey()))
-                                                     .setIndex(chainKey.getIndex())
-                                                     .build();
+    SessionStructure.Chain.ChainKey chainKeyStructure = new SessionStructure.Chain.ChainKey();
+    chainKeyStructure.setKey(chainKey.getKey());
+    chainKeyStructure.setIndex(chainKey.getIndex());
 
-    Chain chain = Chain.newBuilder()
-                       .setChainKey(chainKeyStructure)
-                       .setSenderRatchetKey(ByteString.copyFrom(senderRatchetKey.serialize()))
-                       .build();
+    SessionStructure.Chain chain = new SessionStructure.Chain();
+    chain.setChainkey(chainKeyStructure);
+    chain.setSenderratchetkey(senderRatchetKey.serialize());
 
-    this.sessionStructure = this.sessionStructure.toBuilder().addReceiverChains(chain).build();
+    this.sessionStructure.addReceiverchains(chain);
 
-    if (this.sessionStructure.getReceiverChainsList().size() > 5) {
-      this.sessionStructure = this.sessionStructure.toBuilder()
-                                                   .removeReceiverChains(0)
-                                                   .build();
+    if (this.sessionStructure.getReceiverchainsVector().size() > 5) {
+      this.sessionStructure.getReceiverchainsVector().removeElementAt(0);
     }
   }
 
   public void setSenderChain(ECKeyPair senderRatchetKeyPair, ChainKey chainKey) {
-    Chain.ChainKey chainKeyStructure = Chain.ChainKey.newBuilder()
-                                                     .setKey(ByteString.copyFrom(chainKey.getKey()))
-                                                     .setIndex(chainKey.getIndex())
-                                                     .build();
+    SessionStructure.Chain.ChainKey chainKeyStructure = new SessionStructure.Chain.ChainKey();
+    chainKeyStructure.setKey(chainKey.getKey());
+    chainKeyStructure.setIndex(chainKey.getIndex());
 
-    Chain senderChain = Chain.newBuilder()
-                             .setSenderRatchetKey(ByteString.copyFrom(senderRatchetKeyPair.getPublicKey().serialize()))
-                             .setSenderRatchetKeyPrivate(ByteString.copyFrom(senderRatchetKeyPair.getPrivateKey().serialize()))
-                             .setChainKey(chainKeyStructure)
-                             .build();
+    SessionStructure.Chain senderChain = new SessionStructure.Chain();
+    senderChain.setSenderratchetkey(senderRatchetKeyPair.getPublicKey().serialize());
+    senderChain.setSenderratchetkeyprivate(senderRatchetKeyPair.getPrivateKey().serialize());
+    senderChain.setChainkey(chainKeyStructure);
 
-    this.sessionStructure = this.sessionStructure.toBuilder().setSenderChain(senderChain).build();
+    this.sessionStructure.setSenderchain(senderChain);
   }
 
   public ChainKey getSenderChainKey() {
-    Chain.ChainKey chainKeyStructure = sessionStructure.getSenderChain().getChainKey();
+    SessionStructure.Chain.ChainKey chainKeyStructure = sessionStructure.getSenderchain().getChainkey();
     return new ChainKey(HKDF.createFor(getSessionVersion()),
-                        chainKeyStructure.getKey().toByteArray(), chainKeyStructure.getIndex());
+                        chainKeyStructure.getKey(), chainKeyStructure.getIndex());
   }
 
 
   public void setSenderChainKey(ChainKey nextChainKey) {
-    Chain.ChainKey chainKey = Chain.ChainKey.newBuilder()
-                                            .setKey(ByteString.copyFrom(nextChainKey.getKey()))
-                                            .setIndex(nextChainKey.getIndex())
-                                            .build();
+    SessionStructure.Chain.ChainKey chainKey = new SessionStructure.Chain.ChainKey();
+    chainKey.setKey(nextChainKey.getKey());
+    chainKey.setIndex(nextChainKey.getIndex());
 
-    Chain chain = sessionStructure.getSenderChain().toBuilder()
-                                  .setChainKey(chainKey).build();
-
-    this.sessionStructure = this.sessionStructure.toBuilder().setSenderChain(chain).build();
+    sessionStructure.getSenderchain().setChainkey(chainKey);
   }
 
   public boolean hasMessageKeys(ECPublicKey senderEphemeral, int counter) {
-    Pair<Chain,Integer> chainAndIndex = getReceiverChain(senderEphemeral);
-    Chain               chain         = chainAndIndex.first();
+    Pair                   chainAndIndex = getReceiverChain(senderEphemeral);
+    SessionStructure.Chain chain         = (SessionStructure.Chain) chainAndIndex.first();
 
     if (chain == null) {
       return false;
     }
 
-    List<Chain.MessageKey> messageKeyList = chain.getMessageKeysList();
+    Vector messageKeyList = chain.getMessagekeysVector();
 
-    for (Chain.MessageKey messageKey : messageKeyList) {
+    for (int i=0;i<messageKeyList.size();i++) {
+      SessionStructure.Chain.MessageKey messageKey = (SessionStructure.Chain.MessageKey)messageKeyList.elementAt(i);
+
       if (messageKey.getIndex() == counter) {
         return true;
       }
@@ -277,75 +250,74 @@ public class SessionState {
   }
 
   public MessageKeys removeMessageKeys(ECPublicKey senderEphemeral, int counter) {
-    Pair<Chain,Integer> chainAndIndex = getReceiverChain(senderEphemeral);
-    Chain               chain         = chainAndIndex.first();
+    Pair                   chainAndIndex = getReceiverChain(senderEphemeral);
+    SessionStructure.Chain chain         = (SessionStructure.Chain) chainAndIndex.first();
 
     if (chain == null) {
       return null;
     }
 
-    List<Chain.MessageKey>     messageKeyList     = new LinkedList<>(chain.getMessageKeysList());
-    Iterator<Chain.MessageKey> messageKeyIterator = messageKeyList.iterator();
+    Vector     messageKeyList     = chain.getMessagekeysVector();
+//    Iterator messageKeyIterator = messageKeyList.iterator();
     MessageKeys                result             = null;
 
-    while (messageKeyIterator.hasNext()) {
-      Chain.MessageKey messageKey = messageKeyIterator.next();
+    for (int i=0;i<messageKeyList.size();i++) {
+      SessionStructure.Chain.MessageKey messageKey = (SessionStructure.Chain.MessageKey)messageKeyList.elementAt(i);
 
       if (messageKey.getIndex() == counter) {
-        result = new MessageKeys(new SecretKeySpec(messageKey.getCipherKey().toByteArray(), "AES"),
-                                 new SecretKeySpec(messageKey.getMacKey().toByteArray(), "HmacSHA256"),
-                                 new IvParameterSpec(messageKey.getIv().toByteArray()),
+        result = new MessageKeys(new KeyParameter(messageKey.getCipherkey()),
+                                 new KeyParameter(messageKey.getMackey()),
+                                 new ParametersWithIV(null, messageKey.getIv()),
                                  messageKey.getIndex());
 
-        messageKeyIterator.remove();
+        messageKeyList.removeElementAt(i);
         break;
       }
     }
 
-    Chain updatedChain = chain.toBuilder().clearMessageKeys()
-                              .addAllMessageKeys(messageKeyList)
-                              .build();
-
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setReceiverChains(chainAndIndex.second(), updatedChain)
-                                                 .build();
+//
+//    SessionStructure.Chain updatedChain = chain.getMessagekeysVector().removeAllElements();.clearMessageKeys()
+//                              .addAllMessageKeys(messageKeyList)
+//                              .build();
+//
+//    this.sessionStructure = this.sessionStructure.toBuilder()
+//                                                 .setReceiverChains(chainAndIndex.second(), updatedChain)
+//                                                 .build();
 
     return result;
   }
 
   public void setMessageKeys(ECPublicKey senderEphemeral, MessageKeys messageKeys) {
-    Pair<Chain,Integer> chainAndIndex       = getReceiverChain(senderEphemeral);
-    Chain               chain               = chainAndIndex.first();
-    Chain.MessageKey    messageKeyStructure = Chain.MessageKey.newBuilder()
-                                                              .setCipherKey(ByteString.copyFrom(messageKeys.getCipherKey().getEncoded()))
-                                                              .setMacKey(ByteString.copyFrom(messageKeys.getMacKey().getEncoded()))
-                                                              .setIndex(messageKeys.getCounter())
-                                                              .setIv(ByteString.copyFrom(messageKeys.getIv().getIV()))
-                                                              .build();
+    Pair                              chainAndIndex       = getReceiverChain(senderEphemeral);
+    SessionStructure.Chain            chain               = (SessionStructure.Chain) chainAndIndex.first();
+    SessionStructure.Chain.MessageKey messageKeyStructure = new SessionStructure.Chain.MessageKey();
 
-    Chain updatedChain = chain.toBuilder()
-                              .addMessageKeys(messageKeyStructure)
-                              .build();
+    messageKeyStructure.setCipherkey(messageKeys.getCipherKey().getKey());
+    messageKeyStructure.setMackey(messageKeys.getMacKey().getKey());
+    messageKeyStructure.setIndex(messageKeys.getCounter());
+    messageKeyStructure.setIv(messageKeys.getIv().getIV());
 
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setReceiverChains(chainAndIndex.second(), updatedChain)
-                                                 .build();
+    chain.addMessagekeys(messageKeyStructure);
+//    this.sessionStructure.setR
+//
+//    this.sessionStructure = this.sessionStructure.toBuilder()
+//                                                 .setReceiverChains(chainAndIndex.second(), updatedChain)
+//                                                 .build();
   }
 
   public void setReceiverChainKey(ECPublicKey senderEphemeral, ChainKey chainKey) {
-    Pair<Chain,Integer> chainAndIndex = getReceiverChain(senderEphemeral);
-    Chain               chain         = chainAndIndex.first();
+    Pair                   chainAndIndex = getReceiverChain(senderEphemeral);
+    SessionStructure.Chain chain         = (SessionStructure.Chain) chainAndIndex.first();
 
-    Chain.ChainKey chainKeyStructure = Chain.ChainKey.newBuilder()
-                                                     .setKey(ByteString.copyFrom(chainKey.getKey()))
-                                                     .setIndex(chainKey.getIndex())
-                                                     .build();
+    SessionStructure.Chain.ChainKey chainKeyStructure = new SessionStructure.Chain.ChainKey();
+    chainKeyStructure.setKey(chainKey.getKey());
+    chainKeyStructure.setIndex(chainKey.getIndex());
 
-    Chain updatedChain = chain.toBuilder().setChainKey(chainKeyStructure).build();
+    chain.setChainkey(chainKeyStructure);
 
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setReceiverChains(chainAndIndex.second(), updatedChain)
-                                                 .build();
+//    this.sessionStructure = this.sessionStructure.toBuilder()
+//                                                 .setReceiverChains(chainAndIndex.second(), updatedChain)
+//                                                 .build();
   }
 
   public void setPendingKeyExchange(int sequence,
@@ -353,138 +325,137 @@ public class SessionState {
                                     ECKeyPair ourRatchetKey,
                                     IdentityKeyPair ourIdentityKey)
   {
-    PendingKeyExchange structure =
-        PendingKeyExchange.newBuilder()
-                          .setSequence(sequence)
-                          .setLocalBaseKey(ByteString.copyFrom(ourBaseKey.getPublicKey().serialize()))
-                          .setLocalBaseKeyPrivate(ByteString.copyFrom(ourBaseKey.getPrivateKey().serialize()))
-                          .setLocalRatchetKey(ByteString.copyFrom(ourRatchetKey.getPublicKey().serialize()))
-                          .setLocalRatchetKeyPrivate(ByteString.copyFrom(ourRatchetKey.getPrivateKey().serialize()))
-                          .setLocalIdentityKey(ByteString.copyFrom(ourIdentityKey.getPublicKey().serialize()))
-                          .setLocalIdentityKeyPrivate(ByteString.copyFrom(ourIdentityKey.getPrivateKey().serialize()))
-                          .build();
+    SessionStructure.PendingKeyExchange structure = new SessionStructure.PendingKeyExchange();
+    structure.setSequence(sequence);
+    structure.setLocalbasekey(ourBaseKey.getPublicKey().serialize());
+    structure.setLocalbasekeyprivate(ourBaseKey.getPrivateKey().serialize());
+    structure.setLocalratchetkey(ourRatchetKey.getPublicKey().serialize());
+    structure.setLocalratchetkeyprivate(ourRatchetKey.getPrivateKey().serialize());
+    structure.setLocalidentitykey(ourIdentityKey.getPublicKey().serialize());
+    structure.setLocalidentitykeyprivate(ourIdentityKey.getPrivateKey().serialize());
 
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setPendingKeyExchange(structure)
-                                                 .build();
+    this.sessionStructure.setPendingkeyexchange(structure);
   }
 
   public int getPendingKeyExchangeSequence() {
-    return sessionStructure.getPendingKeyExchange().getSequence();
+    return sessionStructure.getPendingkeyexchange().getSequence();
   }
 
   public ECKeyPair getPendingKeyExchangeBaseKey() throws InvalidKeyException {
-    ECPublicKey publicKey   = Curve.decodePoint(sessionStructure.getPendingKeyExchange()
-                                                                .getLocalBaseKey().toByteArray(), 0);
+    ECPublicKey publicKey   = Curve.decodePoint(sessionStructure.getPendingkeyexchange()
+                                                                .getLocalbasekey(), 0);
 
-    ECPrivateKey privateKey = Curve.decodePrivatePoint(sessionStructure.getPendingKeyExchange()
-                                                                       .getLocalBaseKeyPrivate()
-                                                                       .toByteArray());
+    ECPrivateKey privateKey = Curve.decodePrivatePoint(sessionStructure.getPendingkeyexchange()
+                                                                       .getLocalbasekeyprivate());
 
     return new ECKeyPair(publicKey, privateKey);
   }
 
   public ECKeyPair getPendingKeyExchangeRatchetKey() throws InvalidKeyException {
-    ECPublicKey publicKey   = Curve.decodePoint(sessionStructure.getPendingKeyExchange()
-                                                                .getLocalRatchetKey().toByteArray(), 0);
+    ECPublicKey publicKey   = Curve.decodePoint(sessionStructure.getPendingkeyexchange()
+                                                                .getLocalratchetkey(), 0);
 
-    ECPrivateKey privateKey = Curve.decodePrivatePoint(sessionStructure.getPendingKeyExchange()
-                                                                       .getLocalRatchetKeyPrivate()
-                                                                       .toByteArray());
+    ECPrivateKey privateKey = Curve.decodePrivatePoint(sessionStructure.getPendingkeyexchange()
+                                                                       .getLocalratchetkeyprivate());
 
     return new ECKeyPair(publicKey, privateKey);
   }
 
   public IdentityKeyPair getPendingKeyExchangeIdentityKey() throws InvalidKeyException {
-    IdentityKey publicKey = new IdentityKey(sessionStructure.getPendingKeyExchange()
-                                                            .getLocalIdentityKey().toByteArray(), 0);
+    IdentityKey publicKey = new IdentityKey(sessionStructure.getPendingkeyexchange()
+                                                            .getLocalidentitykey(), 0);
 
-    ECPrivateKey privateKey = Curve.decodePrivatePoint(sessionStructure.getPendingKeyExchange()
-                                                                       .getLocalIdentityKeyPrivate()
-                                                                       .toByteArray());
+    ECPrivateKey privateKey = Curve.decodePrivatePoint(sessionStructure.getPendingkeyexchange()
+                                                                       .getLocalidentitykeyprivate());
 
     return new IdentityKeyPair(publicKey, privateKey);
   }
 
   public boolean hasPendingKeyExchange() {
-    return sessionStructure.hasPendingKeyExchange();
+    return sessionStructure.hasPendingkeyexchange();
   }
 
-  public void setUnacknowledgedPreKeyMessage(Optional<Integer> preKeyId, int signedPreKeyId, ECPublicKey baseKey) {
-    PendingPreKey.Builder pending = PendingPreKey.newBuilder()
-                                                 .setSignedPreKeyId(signedPreKeyId)
-                                                 .setBaseKey(ByteString.copyFrom(baseKey.serialize()));
+  public void setUnacknowledgedPreKeyMessage(Optional preKeyId, int signedPreKeyId, ECPublicKey baseKey) {
+    SessionStructure.PendingPreKey pending = new SessionStructure.PendingPreKey();
+    pending.setSignedprekeyid(signedPreKeyId);
+    pending.setBasekey(baseKey.serialize());
 
     if (preKeyId.isPresent()) {
-      pending.setPreKeyId(preKeyId.get());
+      pending.setPrekeyid(((Integer) preKeyId.get()).intValue());
     }
 
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setPendingPreKey(pending.build())
-                                                 .build();
+    this.sessionStructure.setPendingprekey(pending);
+//    this.sessionStructure = this.sessionStructure.toBuilder()
+//                                                 .setPendingPreKey(pending.build())
+//                                                 .build();
   }
 
   public boolean hasUnacknowledgedPreKeyMessage() {
-    return this.sessionStructure.hasPendingPreKey();
+    return this.sessionStructure.getPendingprekey() != null;
   }
 
   public UnacknowledgedPreKeyMessageItems getUnacknowledgedPreKeyMessageItems() {
     try {
-      Optional<Integer> preKeyId;
+      Optional preKeyId;
 
-      if (sessionStructure.getPendingPreKey().hasPreKeyId()) {
-        preKeyId = Optional.of(sessionStructure.getPendingPreKey().getPreKeyId());
+      if (sessionStructure.getPendingprekey().hasPrekeyid()) {
+        preKeyId = Optional.of(new Integer(sessionStructure.getPendingprekey().getPrekeyid()));
       } else {
         preKeyId = Optional.absent();
       }
 
       return
           new UnacknowledgedPreKeyMessageItems(preKeyId,
-                                               sessionStructure.getPendingPreKey().getSignedPreKeyId(),
-                                               Curve.decodePoint(sessionStructure.getPendingPreKey()
-                                                                                 .getBaseKey()
-                                                                                 .toByteArray(), 0));
+                                               sessionStructure.getPendingprekey().getSignedprekeyid(),
+                                               Curve.decodePoint(sessionStructure.getPendingprekey()
+                                                                                 .getBasekey(), 0));
     } catch (InvalidKeyException e) {
       throw new AssertionError(e);
     }
   }
 
   public void clearUnacknowledgedPreKeyMessage() {
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .clearPendingPreKey()
-                                                 .build();
+    this.sessionStructure.clearPendingprekey();
+//    this.sessionStructure = this.sessionStructure.toBuilder()
+//                                                 .clearPendingPreKey()
+//                                                 .build();
   }
 
   public void setRemoteRegistrationId(int registrationId) {
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setRemoteRegistrationId(registrationId)
-                                                 .build();
+    this.sessionStructure.setRemoteregistrationid(registrationId);
+//    this.sessionStructure = this.sessionStructure.toBuilder()
+//                                                 .setRemoteRegistrationId(registrationId)
+//                                                 .build();
   }
 
   public int getRemoteRegistrationId() {
-    return this.sessionStructure.getRemoteRegistrationId();
+    return this.sessionStructure.getRemoteregistrationid();
+//    return this.sessionStructure.getRemoteRegistrationId();
   }
 
   public void setLocalRegistrationId(int registrationId) {
-    this.sessionStructure = this.sessionStructure.toBuilder()
-                                                 .setLocalRegistrationId(registrationId)
-                                                 .build();
+    this.sessionStructure.setLocalregistrationid(registrationId);
+//    this.sessionStructure = this.sessionStructure.toBuilder()
+//                                                 .setLocalRegistrationId(registrationId)
+//                                                 .build();
   }
 
   public int getLocalRegistrationId() {
-    return this.sessionStructure.getLocalRegistrationId();
+    return this.sessionStructure.getLocalregistrationid();
+//    return this.sessionStructure.getLocalRegistrationId();
   }
 
   public byte[] serialize() {
-    return sessionStructure.toByteArray();
+    return sessionStructure.toBytes();
+//    return sessionStructure.toByteArray();
   }
 
   public static class UnacknowledgedPreKeyMessageItems {
-    private final Optional<Integer> preKeyId;
+    private final Optional preKeyId;
     private final int               signedPreKeyId;
     private final ECPublicKey       baseKey;
 
-    public UnacknowledgedPreKeyMessageItems(Optional<Integer> preKeyId,
+    public UnacknowledgedPreKeyMessageItems(Optional preKeyId,
                                             int signedPreKeyId,
                                             ECPublicKey baseKey)
     {
@@ -494,7 +465,7 @@ public class SessionState {
     }
 
 
-    public Optional<Integer> getPreKeyId() {
+    public Optional getPreKeyId() {
       return preKeyId;
     }
 

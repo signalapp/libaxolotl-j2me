@@ -16,11 +16,6 @@
 
 package org.whispersystems.libaxolotl.util.guava;
 
-import static org.whispersystems.libaxolotl.util.guava.Preconditions.checkNotNull;
-
-import java.io.Serializable;
-import java.util.Iterator;
-import java.util.Set;
 
 
 /**
@@ -65,30 +60,29 @@ import java.util.Set;
  * @author Kevin Bourrillion
  * @since 10.0
  */
-public abstract class Optional<T> implements Serializable {
+public abstract class Optional {
   /**
    * Returns an {@code Optional} instance with no contained reference.
    */
-  @SuppressWarnings("unchecked")
-  public static <T> Optional<T> absent() {
-    return (Optional<T>) Absent.INSTANCE;
+  public static Optional absent() {
+    return Absent.INSTANCE;
   }
 
   /**
    * Returns an {@code Optional} instance containing the given non-null reference.
    */
-  public static <T> Optional<T> of(T reference) {
-    return new Present<T>(checkNotNull(reference));
+  public static Optional of(Object reference) {
+    return new Present(Preconditions.checkNotNull(reference));
   }
 
   /**
    * If {@code nullableReference} is non-null, returns an {@code Optional} instance containing that
    * reference; otherwise returns {@link Optional#absent}.
    */
-  public static <T> Optional<T> fromNullable(T nullableReference) {
+  public static Optional fromNullable(Object nullableReference) {
     return (nullableReference == null)
-        ? Optional.<T>absent()
-        : new Present<T>(nullableReference);
+        ? Optional.absent()
+        : new Present(nullableReference);
   }
 
   Optional() {}
@@ -105,7 +99,7 @@ public abstract class Optional<T> implements Serializable {
    * @throws IllegalStateException if the instance is absent ({@link #isPresent} returns
    *     {@code false})
    */
-  public abstract T get();
+  public abstract Object get();
 
   /**
    * Returns the contained instance if it is present; {@code defaultValue} otherwise. If
@@ -136,13 +130,13 @@ public abstract class Optional<T> implements Serializable {
    *   Optional<Number> first = (Optional) numbers.first();
    *   Number value = first.or(0.5); // fine}</pre>
    */
-  public abstract T or(T defaultValue);
+  public abstract Object or(Object defaultValue);
 
   /**
    * Returns this {@code Optional} if it has a value present; {@code secondChoice}
    * otherwise.
    */
-  public abstract Optional<T> or(Optional<? extends T> secondChoice);
+  public abstract Optional or(Optional secondChoice);
 
   /**
    * Returns the contained instance if it is present; {@code supplier.get()} otherwise. If the
@@ -150,33 +144,33 @@ public abstract class Optional<T> implements Serializable {
    *
    * @throws NullPointerException if the supplier returns {@code null}
    */
-  public abstract T or(Supplier<? extends T> supplier);
+  public abstract Object or(Supplier supplier);
 
   /**
    * Returns the contained instance if it is present; {@code null} otherwise. If the
    * instance is known to be present, use {@link #get()} instead.
    */
-  public abstract T orNull();
+  public abstract Object orNull();
 
-  /**
-   * Returns an immutable singleton {@link Set} whose only element is the contained instance
-   * if it is present; an empty immutable {@link Set} otherwise.
-   *
-   * @since 11.0
-   */
-  public abstract Set<T> asSet();
+//  /**
+//   * Returns an immutable singleton {@link Set} whose only element is the contained instance
+//   * if it is present; an empty immutable {@link Set} otherwise.
+//   *
+//   * @since 11.0
+//   */
+//  public abstract Set asSet();
 
-  /**
-   * If the instance is present, it is transformed with the given {@link Function}; otherwise,
-   * {@link Optional#absent} is returned. If the function returns {@code null}, a
-   * {@link NullPointerException} is thrown.
-   *
-   * @throws NullPointerException if the function returns {@code null}
-   *
-   * @since 12.0
-   */
- 
-  public abstract <V> Optional<V> transform(Function<? super T, V> function);
+//  /**
+//   * If the instance is present, it is transformed with the given {@link Function}; otherwise,
+//   * {@link Optional#absent} is returned. If the function returns {@code null}, a
+//   * {@link NullPointerException} is thrown.
+//   *
+//   * @throws NullPointerException if the function returns {@code null}
+//   *
+//   * @since 12.0
+//   */
+//
+//  public abstract Optional<V> transform(Function<? super T, V> function);
 
   /**
    * Returns {@code true} if {@code object} is an {@code Optional} instance, and either
@@ -184,18 +178,18 @@ public abstract class Optional<T> implements Serializable {
    * are absent. Note that {@code Optional} instances of differing parameterized types can
    * be equal.
    */
-  @Override public abstract boolean equals(Object object);
+  public abstract boolean equals(Object object);
 
   /**
    * Returns a hash code for this instance.
    */
-  @Override public abstract int hashCode();
+  public abstract int hashCode();
 
   /**
    * Returns a string representation for this instance. The form of this string
    * representation is unspecified.
    */
-  @Override public abstract String toString();
+  public abstract String toString();
 
   /**
    * Returns the value of each present instance from the supplied {@code optionals}, in order,
@@ -228,5 +222,5 @@ public abstract class Optional<T> implements Serializable {
 //    };
 //  }
 
-  private static final long serialVersionUID = 0;
+//  private static final long serialVersionUID = 0;
 }

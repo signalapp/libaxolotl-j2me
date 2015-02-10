@@ -17,12 +17,12 @@
 
 package org.whispersystems.libaxolotl.kdf;
 
-import java.io.ByteArrayOutputStream;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
+import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.macs.HMac;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.whispersystems.libaxolotl.j2me.AssertionError;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
+import java.io.ByteArrayOutputStream;
 
 public abstract class HKDF {
 
@@ -47,45 +47,44 @@ public abstract class HKDF {
   }
 
   private byte[] extract(byte[] salt, byte[] inputKeyMaterial) {
-    try {
-      Mac mac = Mac.getInstance("HmacSHA256");
-      mac.init(new SecretKeySpec(salt, "HmacSHA256"));
-      return mac.doFinal(inputKeyMaterial);
-    } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-      throw new AssertionError(e);
-    }
+    HMac   mac    = new HMac(new SHA256Digest());
+    byte[] output = new byte[mac.getMacSize()];
+    mac.init(new KeyParameter(salt, 0, salt.length));
+
+    mac.update(inputKeyMaterial, 0, inputKeyMaterial.length);
+    mac.doFinal(output, 0);
+
+    return output;
   }
 
   private byte[] expand(byte[] prk, byte[] info, int outputSize) {
-    try {
-      int                   iterations     = (int) Math.ceil((double) outputSize / (double) HASH_OUTPUT_SIZE);
-      byte[]                mixin          = new byte[0];
-      ByteArrayOutputStream results        = new ByteArrayOutputStream();
-      int                   remainingBytes = outputSize;
+    int                   iterations     = (int) Math.ceil((double) outputSize / (double) HASH_OUTPUT_SIZE);
+    byte[]                mixin          = new byte[0];
+    ByteArrayOutputStream results        = new ByteArrayOutputStream();
+    int                   remainingBytes = outputSize;
 
-      for (int i= getIterationStartOffset();i<iterations + getIterationStartOffset();i++) {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(prk, "HmacSHA256"));
+    for (int i= getIterationStartOffset();i<iterations + getIterationStartOffset();i++) {
+      HMac   mac        = new HMac(new SHA256Digest());
+      byte[] stepResult = new byte[mac.getMacSize()];
+      mac.init(new KeyParameter(prk, 0, prk.length));
 
-        mac.update(mixin);
-        if (info != null) {
-          mac.update(info);
-        }
-        mac.update((byte)i);
-
-        byte[] stepResult = mac.doFinal();
-        int    stepSize   = Math.min(remainingBytes, stepResult.length);
-
-        results.write(stepResult, 0, stepSize);
-
-        mixin          = stepResult;
-        remainingBytes -= stepSize;
+      mac.update(mixin, 0, mixin.length);
+      if (info != null) {
+        mac.update(info, 0, info.length);
       }
+      mac.update((byte)i);
 
-      return results.toByteArray();
-    } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-      throw new AssertionError(e);
+      mac.doFinal(stepResult, 0);
+
+      int stepSize = Math.min(remainingBytes, stepResult.length);
+
+      results.write(stepResult, 0, stepSize);
+
+      mixin          = stepResult;
+      remainingBytes -= stepSize;
     }
+
+    return results.toByteArray();
   }
 
   protected abstract int getIterationStartOffset();

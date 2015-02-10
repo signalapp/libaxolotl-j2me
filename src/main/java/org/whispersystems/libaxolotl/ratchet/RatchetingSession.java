@@ -16,23 +16,26 @@
  */
 package org.whispersystems.libaxolotl.ratchet;
 
+import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
 import org.whispersystems.libaxolotl.kdf.HKDF;
 import org.whispersystems.libaxolotl.state.SessionState;
+import org.whispersystems.libaxolotl.j2me.Arrays;
+import org.whispersystems.libaxolotl.j2me.AssertionError;
 import org.whispersystems.libaxolotl.util.ByteUtil;
 import org.whispersystems.libaxolotl.util.Pair;
 import org.whispersystems.libaxolotl.util.guava.Optional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Arrays;
 
 public class RatchetingSession {
 
-  public static void initializeSession(SessionState sessionState,
+  public static void initializeSession(SecureRandomProvider secureRandom,
+                                       SessionState sessionState,
                                        int sessionVersion,
                                        SymmetricAxolotlParameters parameters)
       throws InvalidKeyException
@@ -45,16 +48,16 @@ public class RatchetingSession {
                      .setTheirRatchetKey(parameters.getTheirRatchetKey())
                      .setTheirIdentityKey(parameters.getTheirIdentityKey())
                      .setTheirSignedPreKey(parameters.getTheirBaseKey())
-                     .setTheirOneTimePreKey(Optional.<ECPublicKey>absent());
+                     .setTheirOneTimePreKey(Optional.absent());
 
-      RatchetingSession.initializeSession(sessionState, sessionVersion, aliceParameters.create());
+      RatchetingSession.initializeSession(secureRandom, sessionState, sessionVersion, aliceParameters.create());
     } else {
       BobAxolotlParameters.Builder bobParameters = BobAxolotlParameters.newBuilder();
 
       bobParameters.setOurIdentityKey(parameters.getOurIdentityKey())
                    .setOurRatchetKey(parameters.getOurRatchetKey())
                    .setOurSignedPreKey(parameters.getOurBaseKey())
-                   .setOurOneTimePreKey(Optional.<ECKeyPair>absent())
+                   .setOurOneTimePreKey(Optional.absent())
                    .setTheirBaseKey(parameters.getTheirBaseKey())
                    .setTheirIdentityKey(parameters.getTheirIdentityKey());
 
@@ -62,7 +65,8 @@ public class RatchetingSession {
     }
   }
 
-  public static void initializeSession(SessionState sessionState,
+  public static void initializeSession(SecureRandomProvider secureRandom,
+                                       SessionState sessionState,
                                        int sessionVersion,
                                        AliceAxolotlParameters parameters)
       throws InvalidKeyException
@@ -72,7 +76,7 @@ public class RatchetingSession {
       sessionState.setRemoteIdentityKey(parameters.getTheirIdentityKey());
       sessionState.setLocalIdentityKey(parameters.getOurIdentityKey().getPublicKey());
 
-      ECKeyPair             sendingRatchetKey = Curve.generateKeyPair();
+      ECKeyPair             sendingRatchetKey = Curve.generateKeyPair(secureRandom);
       ByteArrayOutputStream secrets           = new ByteArrayOutputStream();
 
       if (sessionVersion >= 3) {
@@ -87,16 +91,16 @@ public class RatchetingSession {
                                              parameters.getOurBaseKey().getPrivateKey()));
 
       if (sessionVersion >= 3 && parameters.getTheirOneTimePreKey().isPresent()) {
-        secrets.write(Curve.calculateAgreement(parameters.getTheirOneTimePreKey().get(),
+        secrets.write(Curve.calculateAgreement((ECPublicKey)parameters.getTheirOneTimePreKey().get(),
                                                parameters.getOurBaseKey().getPrivateKey()));
       }
 
-      DerivedKeys             derivedKeys  = calculateDerivedKeys(sessionVersion, secrets.toByteArray());
-      Pair<RootKey, ChainKey> sendingChain = derivedKeys.getRootKey().createChain(parameters.getTheirRatchetKey(), sendingRatchetKey);
+      DerivedKeys derivedKeys  = calculateDerivedKeys(sessionVersion, secrets.toByteArray());
+      Pair        sendingChain = derivedKeys.getRootKey().createChain(parameters.getTheirRatchetKey(), sendingRatchetKey);
 
       sessionState.addReceiverChain(parameters.getTheirRatchetKey(), derivedKeys.getChainKey());
-      sessionState.setSenderChain(sendingRatchetKey, sendingChain.second());
-      sessionState.setRootKey(sendingChain.first());
+      sessionState.setSenderChain(sendingRatchetKey, (ChainKey)sendingChain.second());
+      sessionState.setRootKey((RootKey)sendingChain.first());
     } catch (IOException e) {
       throw new AssertionError(e);
     }
@@ -128,7 +132,7 @@ public class RatchetingSession {
 
       if (sessionVersion >= 3 && parameters.getOurOneTimePreKey().isPresent()) {
         secrets.write(Curve.calculateAgreement(parameters.getTheirBaseKey(),
-                                               parameters.getOurOneTimePreKey().get().getPrivateKey()));
+                                               ((ECKeyPair)parameters.getOurOneTimePreKey().get()).getPrivateKey()));
       }
 
       DerivedKeys derivedKeys = calculateDerivedKeys(sessionVersion, secrets.toByteArray());

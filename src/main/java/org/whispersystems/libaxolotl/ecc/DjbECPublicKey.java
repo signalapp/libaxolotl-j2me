@@ -17,10 +17,9 @@
 
 package org.whispersystems.libaxolotl.ecc;
 
+import org.whispersystems.libaxolotl.j2me.Arrays;
+import org.whispersystems.libaxolotl.j2me.BigInteger;
 import org.whispersystems.libaxolotl.util.ByteUtil;
-
-import java.math.BigInteger;
-import java.util.Arrays;
 
 public class DjbECPublicKey implements ECPublicKey {
 
@@ -30,18 +29,18 @@ public class DjbECPublicKey implements ECPublicKey {
     this.publicKey = publicKey;
   }
 
-  @Override
+//  @Override
   public byte[] serialize() {
     byte[] type = {Curve.DJB_TYPE};
     return ByteUtil.combine(type, publicKey);
   }
 
-  @Override
+//  @Override
   public int getType() {
     return Curve.DJB_TYPE;
   }
 
-  @Override
+//  @Override
   public boolean equals(Object other) {
     if (other == null)                      return false;
     if (!(other instanceof DjbECPublicKey)) return false;
@@ -50,12 +49,12 @@ public class DjbECPublicKey implements ECPublicKey {
     return Arrays.equals(this.publicKey, that.publicKey);
   }
 
-  @Override
+//  @Override
   public int hashCode() {
     return Arrays.hashCode(publicKey);
   }
 
-  @Override
+//  @Override
   public int compareTo(ECPublicKey another) {
     return new BigInteger(publicKey).compareTo(new BigInteger(((DjbECPublicKey)another).publicKey));
   }

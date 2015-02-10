@@ -1,6 +1,7 @@
 package org.whispersystems.libaxolotl;
 
 
+import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
@@ -20,6 +21,7 @@ import org.whispersystems.libaxolotl.state.SessionRecord;
 import org.whispersystems.libaxolotl.state.SessionState;
 import org.whispersystems.libaxolotl.state.SessionStore;
 import org.whispersystems.libaxolotl.state.SignedPreKeyStore;
+import org.whispersystems.libaxolotl.j2me.AssertionError;
 import org.whispersystems.libaxolotl.util.KeyHelper;
 import org.whispersystems.libaxolotl.util.Medium;
 import org.whispersystems.libaxolotl.util.guava.Optional;
@@ -43,14 +45,15 @@ import org.whispersystems.libaxolotl.util.guava.Optional;
  */
 public class SessionBuilder {
 
-  private static final String TAG = SessionBuilder.class.getSimpleName();
+  private static final String TAG = "SessionBuilder";
 
-  private final SessionStore      sessionStore;
-  private final PreKeyStore       preKeyStore;
-  private final SignedPreKeyStore signedPreKeyStore;
-  private final IdentityKeyStore  identityKeyStore;
-  private final long              recipientId;
-  private final int               deviceId;
+  private final SecureRandomProvider secureRandomProvider;
+  private final SessionStore         sessionStore;
+  private final PreKeyStore          preKeyStore;
+  private final SignedPreKeyStore    signedPreKeyStore;
+  private final IdentityKeyStore     identityKeyStore;
+  private final long                 recipientId;
+  private final int                  deviceId;
 
   /**
    * Constructs a SessionBuilder.
@@ -61,18 +64,20 @@ public class SessionBuilder {
    * @param recipientId The recipient ID of the remote user to build a session with.
    * @param deviceId The device ID of the remote user's physical device.
    */
-  public SessionBuilder(SessionStore sessionStore,
+  public SessionBuilder(SecureRandomProvider secureRandomProvider,
+                        SessionStore sessionStore,
                         PreKeyStore preKeyStore,
                         SignedPreKeyStore signedPreKeyStore,
                         IdentityKeyStore identityKeyStore,
                         long recipientId, int deviceId)
   {
-    this.sessionStore      = sessionStore;
-    this.preKeyStore       = preKeyStore;
-    this.signedPreKeyStore = signedPreKeyStore;
-    this.identityKeyStore  = identityKeyStore;
-    this.recipientId       = recipientId;
-    this.deviceId          = deviceId;
+    this.secureRandomProvider = secureRandomProvider;
+    this.sessionStore         = sessionStore;
+    this.preKeyStore          = preKeyStore;
+    this.signedPreKeyStore    = signedPreKeyStore;
+    this.identityKeyStore     = identityKeyStore;
+    this.recipientId          = recipientId;
+    this.deviceId             = deviceId;
   }
 
   /**
@@ -81,8 +86,8 @@ public class SessionBuilder {
    * @param recipientId The recipient ID of the remote user to build a session with.
    * @param deviceId The device ID of the remote user's physical device.
    */
-  public SessionBuilder(AxolotlStore store, long recipientId, int deviceId) {
-    this(store, store, store, store, recipientId, deviceId);
+  public SessionBuilder(SecureRandomProvider secureRandomProvider, AxolotlStore store, long recipientId, int deviceId) {
+    this(secureRandomProvider, store, store, store, store, recipientId, deviceId);
   }
 
   /**
@@ -99,13 +104,13 @@ public class SessionBuilder {
    * @throws org.whispersystems.libaxolotl.InvalidKeyException when the message is formatted incorrectly.
    * @throws org.whispersystems.libaxolotl.UntrustedIdentityException when the {@link IdentityKey} of the sender is untrusted.
    */
-  /*package*/ Optional<Integer> process(SessionRecord sessionRecord, PreKeyWhisperMessage message)
+  /*package*/ Optional process(SessionRecord sessionRecord, PreKeyWhisperMessage message)
       throws InvalidKeyIdException, InvalidKeyException, UntrustedIdentityException
   {
     int         messageVersion   = message.getMessageVersion();
     IdentityKey theirIdentityKey = message.getIdentityKey();
 
-    Optional<Integer> unsignedPreKeyId;
+    Optional unsignedPreKeyId;
 
     if (!identityKeyStore.isTrustedIdentity(recipientId, theirIdentityKey)) {
       throw new UntrustedIdentityException();
@@ -121,7 +126,7 @@ public class SessionBuilder {
     return unsignedPreKeyId;
   }
 
-  private Optional<Integer> processV3(SessionRecord sessionRecord, PreKeyWhisperMessage message)
+  private Optional processV3(SessionRecord sessionRecord, PreKeyWhisperMessage message)
       throws UntrustedIdentityException, InvalidKeyIdException, InvalidKeyException
   {
 
@@ -141,9 +146,9 @@ public class SessionBuilder {
               .setOurRatchetKey(ourSignedPreKey);
 
     if (message.getPreKeyId().isPresent()) {
-      parameters.setOurOneTimePreKey(Optional.of(preKeyStore.loadPreKey(message.getPreKeyId().get()).getKeyPair()));
+      parameters.setOurOneTimePreKey(Optional.of(preKeyStore.loadPreKey(((Integer)message.getPreKeyId().get()).intValue()).getKeyPair()));
     } else {
-      parameters.setOurOneTimePreKey(Optional.<ECKeyPair>absent());
+      parameters.setOurOneTimePreKey(Optional.absent());
     }
 
     if (!sessionRecord.isFresh()) sessionRecord.archiveCurrentState();
@@ -154,35 +159,35 @@ public class SessionBuilder {
     sessionRecord.getSessionState().setRemoteRegistrationId(message.getRegistrationId());
     sessionRecord.getSessionState().setAliceBaseKey(message.getBaseKey().serialize());
 
-    if (message.getPreKeyId().isPresent() && message.getPreKeyId().get() != Medium.MAX_VALUE) {
+    if (message.getPreKeyId().isPresent() && ((Integer)message.getPreKeyId().get()).intValue() != Medium.MAX_VALUE) {
       return message.getPreKeyId();
     } else {
       return Optional.absent();
     }
   }
 
-  private Optional<Integer> processV2(SessionRecord sessionRecord, PreKeyWhisperMessage message)
+  private Optional processV2(SessionRecord sessionRecord, PreKeyWhisperMessage message)
       throws UntrustedIdentityException, InvalidKeyIdException, InvalidKeyException
   {
     if (!message.getPreKeyId().isPresent()) {
       throw new InvalidKeyIdException("V2 message requires one time prekey id!");
     }
 
-    if (!preKeyStore.containsPreKey(message.getPreKeyId().get()) &&
+    if (!preKeyStore.containsPreKey(((Integer)message.getPreKeyId().get()).intValue()) &&
         sessionStore.containsSession(recipientId, deviceId))
     {
       Log.w(TAG, "We've already processed the prekey part of this V2 session, letting bundled message fall through...");
       return Optional.absent();
     }
 
-    ECKeyPair ourPreKey = preKeyStore.loadPreKey(message.getPreKeyId().get()).getKeyPair();
+    ECKeyPair ourPreKey = preKeyStore.loadPreKey(((Integer)message.getPreKeyId().get()).intValue()).getKeyPair();
 
     BobAxolotlParameters.Builder parameters = BobAxolotlParameters.newBuilder();
 
     parameters.setOurIdentityKey(identityKeyStore.getIdentityKeyPair())
               .setOurSignedPreKey(ourPreKey)
               .setOurRatchetKey(ourPreKey)
-              .setOurOneTimePreKey(Optional.<ECKeyPair>absent())
+              .setOurOneTimePreKey(Optional.absent())
               .setTheirIdentityKey(message.getIdentityKey())
               .setTheirBaseKey(message.getBaseKey());
 
@@ -194,7 +199,7 @@ public class SessionBuilder {
     sessionRecord.getSessionState().setRemoteRegistrationId(message.getRegistrationId());
     sessionRecord.getSessionState().setAliceBaseKey(message.getBaseKey().serialize());
 
-    if (message.getPreKeyId().get() != Medium.MAX_VALUE) {
+    if (((Integer)message.getPreKeyId().get()).intValue() != Medium.MAX_VALUE) {
       return message.getPreKeyId();
     } else {
       return Optional.absent();
@@ -230,13 +235,13 @@ public class SessionBuilder {
         throw new InvalidKeyException("Both signed and unsigned prekeys are absent!");
       }
 
-      boolean               supportsV3           = preKey.getSignedPreKey() != null;
-      SessionRecord         sessionRecord        = sessionStore.loadSession(recipientId, deviceId);
-      ECKeyPair             ourBaseKey           = Curve.generateKeyPair();
-      ECPublicKey           theirSignedPreKey    = supportsV3 ? preKey.getSignedPreKey() : preKey.getPreKey();
-      Optional<ECPublicKey> theirOneTimePreKey   = Optional.fromNullable(preKey.getPreKey());
-      Optional<Integer>     theirOneTimePreKeyId = theirOneTimePreKey.isPresent() ? Optional.of(preKey.getPreKeyId()) :
-                                                                                    Optional.<Integer>absent();
+      boolean       supportsV3           = preKey.getSignedPreKey() != null;
+      SessionRecord sessionRecord        = sessionStore.loadSession(recipientId, deviceId);
+      ECKeyPair     ourBaseKey           = Curve.generateKeyPair(secureRandomProvider);
+      ECPublicKey   theirSignedPreKey    = supportsV3 ? preKey.getSignedPreKey() : preKey.getPreKey();
+      Optional      theirOneTimePreKey   = Optional.fromNullable(preKey.getPreKey());
+      Optional      theirOneTimePreKeyId = theirOneTimePreKey.isPresent() ? Optional.of(new Integer(preKey.getPreKeyId())) :
+                                                                           Optional.absent();
 
       AliceAxolotlParameters.Builder parameters = AliceAxolotlParameters.newBuilder();
 
@@ -245,11 +250,12 @@ public class SessionBuilder {
                 .setTheirIdentityKey(preKey.getIdentityKey())
                 .setTheirSignedPreKey(theirSignedPreKey)
                 .setTheirRatchetKey(theirSignedPreKey)
-                .setTheirOneTimePreKey(supportsV3 ? theirOneTimePreKey : Optional.<ECPublicKey>absent());
+                .setTheirOneTimePreKey(supportsV3 ? theirOneTimePreKey : Optional.absent());
 
       if (!sessionRecord.isFresh()) sessionRecord.archiveCurrentState();
 
-      RatchetingSession.initializeSession(sessionRecord.getSessionState(),
+      RatchetingSession.initializeSession(secureRandomProvider,
+                                          sessionRecord.getSessionState(),
                                           supportsV3 ? 3 : 2,
                                           parameters.create());
 
@@ -304,8 +310,8 @@ public class SessionBuilder {
 
     if (!sessionRecord.getSessionState().hasPendingKeyExchange()) {
       builder.setOurIdentityKey(identityKeyStore.getIdentityKeyPair())
-             .setOurBaseKey(Curve.generateKeyPair())
-             .setOurRatchetKey(Curve.generateKeyPair());
+             .setOurBaseKey(Curve.generateKeyPair(secureRandomProvider))
+             .setOurRatchetKey(Curve.generateKeyPair(secureRandomProvider));
     } else {
       builder.setOurIdentityKey(sessionRecord.getSessionState().getPendingKeyExchangeIdentityKey())
              .setOurBaseKey(sessionRecord.getSessionState().getPendingKeyExchangeBaseKey())
@@ -321,14 +327,16 @@ public class SessionBuilder {
 
     if (!sessionRecord.isFresh()) sessionRecord.archiveCurrentState();
 
-    RatchetingSession.initializeSession(sessionRecord.getSessionState(),
+    RatchetingSession.initializeSession(secureRandomProvider,
+                                        sessionRecord.getSessionState(),
                                         Math.min(message.getMaxVersion(), CiphertextMessage.CURRENT_VERSION),
                                         parameters);
 
     sessionStore.storeSession(recipientId, deviceId, sessionRecord);
     identityKeyStore.saveIdentity(recipientId, message.getIdentityKey());
 
-    byte[] baseKeySignature = Curve.calculateSignature(parameters.getOurIdentityKey().getPrivateKey(),
+    byte[] baseKeySignature = Curve.calculateSignature(secureRandomProvider,
+                                                       parameters.getOurIdentityKey().getPrivateKey(),
                                                        parameters.getOurBaseKey().getPublicKey().serialize());
 
     return new KeyExchangeMessage(sessionRecord.getSessionState().getSessionVersion(),
@@ -363,7 +371,8 @@ public class SessionBuilder {
 
     if (!sessionRecord.isFresh()) sessionRecord.archiveCurrentState();
 
-    RatchetingSession.initializeSession(sessionRecord.getSessionState(),
+    RatchetingSession.initializeSession(secureRandomProvider,
+                                        sessionRecord.getSessionState(),
                                         Math.min(message.getMaxVersion(), CiphertextMessage.CURRENT_VERSION),
                                         parameters.create());
 
@@ -388,12 +397,12 @@ public class SessionBuilder {
   public KeyExchangeMessage process() {
     synchronized (SessionCipher.SESSION_LOCK) {
       try {
-        int             sequence         = KeyHelper.getRandomSequence(65534) + 1;
+        int             sequence         = KeyHelper.getRandomSequence(secureRandomProvider, 65534) + 1;
         int             flags            = KeyExchangeMessage.INITIATE_FLAG;
-        ECKeyPair       baseKey          = Curve.generateKeyPair();
-        ECKeyPair       ratchetKey       = Curve.generateKeyPair();
+        ECKeyPair       baseKey          = Curve.generateKeyPair(secureRandomProvider);
+        ECKeyPair       ratchetKey       = Curve.generateKeyPair(secureRandomProvider);
         IdentityKeyPair identityKey      = identityKeyStore.getIdentityKeyPair();
-        byte[]          baseKeySignature = Curve.calculateSignature(identityKey.getPrivateKey(), baseKey.getPublicKey().serialize());
+        byte[]          baseKeySignature = Curve.calculateSignature(secureRandomProvider, identityKey.getPrivateKey(), baseKey.getPublicKey().serialize());
         SessionRecord   sessionRecord    = sessionStore.loadSession(recipientId, deviceId);
 
         sessionRecord.getSessionState().setPendingKeyExchange(sequence, baseKey, ratchetKey, identityKey);

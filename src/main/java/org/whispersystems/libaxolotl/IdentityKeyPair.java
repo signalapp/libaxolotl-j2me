@@ -16,13 +16,10 @@
  */
 package org.whispersystems.libaxolotl;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECPrivateKey;
+import org.whispersystems.libaxolotl.state.protos.IdentityKeyPairStructure;
 
-import static org.whispersystems.libaxolotl.state.StorageProtos.IdentityKeyPairStructure;
 
 /**
  * Holder for public and private identity key pair.
@@ -40,13 +37,9 @@ public class IdentityKeyPair {
   }
 
   public IdentityKeyPair(byte[] serialized) throws InvalidKeyException {
-    try {
-      IdentityKeyPairStructure structure = IdentityKeyPairStructure.parseFrom(serialized);
-      this.publicKey  = new IdentityKey(structure.getPublicKey().toByteArray(), 0);
-      this.privateKey = Curve.decodePrivatePoint(structure.getPrivateKey().toByteArray());
-    } catch (InvalidProtocolBufferException e) {
-      throw new InvalidKeyException(e);
-    }
+    IdentityKeyPairStructure structure = IdentityKeyPairStructure.fromBytes(serialized);
+    this.publicKey  = new IdentityKey(structure.getPublickey(), 0);
+    this.privateKey = Curve.decodePrivatePoint(structure.getPrivatekey());
   }
 
   public IdentityKey getPublicKey() {
@@ -58,9 +51,10 @@ public class IdentityKeyPair {
   }
 
   public byte[] serialize() {
-    return IdentityKeyPairStructure.newBuilder()
-                                   .setPublicKey(ByteString.copyFrom(publicKey.serialize()))
-                                   .setPrivateKey(ByteString.copyFrom(privateKey.serialize()))
-                                   .build().toByteArray();
+    IdentityKeyPairStructure structure = new IdentityKeyPairStructure();
+    structure.setPublickey(publicKey.serialize());
+    structure.setPrivatekey(privateKey.serialize());
+
+    return structure.toBytes();
   }
 }

@@ -25,12 +25,12 @@ public class DjbECPrivateKey implements ECPrivateKey {
     this.privateKey = privateKey;
   }
 
-  @Override
+//  @Override
   public byte[] serialize() {
     return privateKey;
   }
 
-  @Override
+//  @Override
   public int getType() {
     return Curve.DJB_TYPE;
   }

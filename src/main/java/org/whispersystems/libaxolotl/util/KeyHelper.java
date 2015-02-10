@@ -1,5 +1,6 @@
 package org.whispersystems.libaxolotl.util;
 
+import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.IdentityKey;
 import org.whispersystems.libaxolotl.IdentityKeyPair;
 import org.whispersystems.libaxolotl.InvalidKeyException;
@@ -8,10 +9,7 @@ import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.state.PreKeyRecord;
 import org.whispersystems.libaxolotl.state.SignedPreKeyRecord;
 
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Vector;
 
 /**
  * Helper class for generating keys of different types.
@@ -28,8 +26,8 @@ public class KeyHelper {
    *
    * @return the generated IdentityKeyPair.
    */
-  public static IdentityKeyPair generateIdentityKeyPair() {
-    ECKeyPair   keyPair   = Curve.generateKeyPair();
+  public static IdentityKeyPair generateIdentityKeyPair(SecureRandomProvider secureRandom) {
+    ECKeyPair   keyPair   = Curve.generateKeyPair(secureRandom);
     IdentityKey publicKey = new IdentityKey(keyPair.getPublicKey());
     return new IdentityKeyPair(publicKey, keyPair.getPrivateKey());
   }
@@ -45,22 +43,13 @@ public class KeyHelper {
    *                      higher encoding overhead.
    * @return the generated registration ID.
    */
-  public static int generateRegistrationId(boolean extendedRange) {
-    try {
-      SecureRandom secureRandom = SecureRandom.getInstance("SHA1PRNG");
-      if (extendedRange) return secureRandom.nextInt(Integer.MAX_VALUE - 1) + 1;
-      else               return secureRandom.nextInt(16380) + 1;
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError(e);
-    }
+  public static int generateRegistrationId(SecureRandomProvider secureRandom, boolean extendedRange) {
+    if (extendedRange) return secureRandom.nextInt(Integer.MAX_VALUE - 1) + 1;
+    else               return secureRandom.nextInt(16380) + 1;
   }
 
-  public static int getRandomSequence(int max) {
-    try {
-      return SecureRandom.getInstance("SHA1PRNG").nextInt(max);
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError(e);
-    }
+  public static int getRandomSequence(SecureRandomProvider secureRandomProvider, int max) {
+    return secureRandomProvider.nextInt(max);
   }
 
   /**
@@ -75,13 +64,13 @@ public class KeyHelper {
    * @param count The number of PreKeys to generate.
    * @return the list of generated PreKeyRecords.
    */
-  public static List<PreKeyRecord> generatePreKeys(int start, int count) {
-    List<PreKeyRecord> results = new LinkedList<>();
+  public static Vector generatePreKeys(SecureRandomProvider secureRandom, int start, int count) {
+    Vector results = new Vector();
 
     start--;
 
     for (int i=0;i<count;i++) {
-      results.add(new PreKeyRecord(((start + i) % (Medium.MAX_VALUE-1)) + 1, Curve.generateKeyPair()));
+      results.addElement(new PreKeyRecord(((start + i) % (Medium.MAX_VALUE - 1)) + 1, Curve.generateKeyPair(secureRandom)));
     }
 
     return results;
@@ -93,8 +82,8 @@ public class KeyHelper {
    *
    * @return the generated last resort PreKeyRecord.
    */
-  public static PreKeyRecord generateLastResortPreKey() {
-    ECKeyPair keyPair = Curve.generateKeyPair();
+  public static PreKeyRecord generateLastResortPreKey(SecureRandomProvider secureRandom) {
+    ECKeyPair keyPair = Curve.generateKeyPair(secureRandom);
     return new PreKeyRecord(Medium.MAX_VALUE, keyPair);
   }
 
@@ -107,37 +96,30 @@ public class KeyHelper {
    * @return the generated signed PreKey
    * @throws InvalidKeyException when the provided identity key is invalid
    */
-  public static SignedPreKeyRecord generateSignedPreKey(IdentityKeyPair identityKeyPair, int signedPreKeyId)
+  public static SignedPreKeyRecord generateSignedPreKey(SecureRandomProvider secureRandom,
+                                                        IdentityKeyPair identityKeyPair, int signedPreKeyId)
       throws InvalidKeyException
   {
-    ECKeyPair keyPair   = Curve.generateKeyPair();
-    byte[]    signature = Curve.calculateSignature(identityKeyPair.getPrivateKey(), keyPair.getPublicKey().serialize());
+    ECKeyPair keyPair   = Curve.generateKeyPair(secureRandom);
+    byte[]    signature = Curve.calculateSignature(secureRandom, identityKeyPair.getPrivateKey(), keyPair.getPublicKey().serialize());
 
     return new SignedPreKeyRecord(signedPreKeyId, System.currentTimeMillis(), keyPair, signature);
   }
 
 
-  public static ECKeyPair generateSenderSigningKey() {
-    return Curve.generateKeyPair();
+  public static ECKeyPair generateSenderSigningKey(SecureRandomProvider secureRandom) {
+    return Curve.generateKeyPair(secureRandom);
   }
 
-  public static byte[] generateSenderKey() {
-    try {
-      byte[] key = new byte[32];
-      SecureRandom.getInstance("SHA1PRNG").nextBytes(key);
+  public static byte[] generateSenderKey(SecureRandomProvider secureRandom) {
+    byte[] key = new byte[32];
+    secureRandom.nextBytes(key);
 
-      return key;
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError(e);
-    }
+    return key;
   }
 
-  public static int generateSenderKeyId() {
-    try {
-      return SecureRandom.getInstance("SHA1PRNG").nextInt(Integer.MAX_VALUE);
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError(e);
-    }
+  public static int generateSenderKeyId(SecureRandomProvider secureRandom) {
+    return secureRandom.nextInt(Integer.MAX_VALUE);
   }
 
 }

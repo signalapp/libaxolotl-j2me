@@ -51,7 +51,7 @@ public class IdentityKey {
     return Hex.toString(publicKey.serialize());
   }
 	
-  @Override
+//  @Override
   public boolean equals(Object other) {
     if (other == null)                   return false;
     if (!(other instanceof IdentityKey)) return false;
@@ -59,7 +59,7 @@ public class IdentityKey {
     return publicKey.equals(((IdentityKey) other).getPublicKey());
   }
 	
-  @Override
+//  @Override
   public int hashCode() {
     return publicKey.hashCode();
   }

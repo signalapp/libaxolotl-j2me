@@ -13,12 +13,12 @@ public class AliceAxolotlParameters {
 
   private final IdentityKey           theirIdentityKey;
   private final ECPublicKey           theirSignedPreKey;
-  private final Optional<ECPublicKey> theirOneTimePreKey;
+  private final Optional              theirOneTimePreKey;
   private final ECPublicKey           theirRatchetKey;
 
   private AliceAxolotlParameters(IdentityKeyPair ourIdentityKey, ECKeyPair ourBaseKey,
                                  IdentityKey theirIdentityKey, ECPublicKey theirSignedPreKey,
-                                 ECPublicKey theirRatchetKey, Optional<ECPublicKey> theirOneTimePreKey)
+                                 ECPublicKey theirRatchetKey, Optional theirOneTimePreKey)
   {
     this.ourIdentityKey     = ourIdentityKey;
     this.ourBaseKey         = ourBaseKey;
@@ -50,7 +50,7 @@ public class AliceAxolotlParameters {
     return theirSignedPreKey;
   }
 
-  public Optional<ECPublicKey> getTheirOneTimePreKey() {
+  public Optional getTheirOneTimePreKey() {
     return theirOneTimePreKey;
   }
 
@@ -69,7 +69,7 @@ public class AliceAxolotlParameters {
     private IdentityKey           theirIdentityKey;
     private ECPublicKey           theirSignedPreKey;
     private ECPublicKey           theirRatchetKey;
-    private Optional<ECPublicKey> theirOneTimePreKey;
+    private Optional              theirOneTimePreKey;
 
     public Builder setOurIdentityKey(IdentityKeyPair ourIdentityKey) {
       this.ourIdentityKey = ourIdentityKey;
@@ -96,7 +96,7 @@ public class AliceAxolotlParameters {
       return this;
     }
 
-    public Builder setTheirOneTimePreKey(Optional<ECPublicKey> theirOneTimePreKey) {
+    public Builder setTheirOneTimePreKey(Optional theirOneTimePreKey) {
       this.theirOneTimePreKey = theirOneTimePreKey;
       return this;
     }

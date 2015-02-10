@@ -16,20 +16,20 @@
  */
 package org.whispersystems.libaxolotl.util;
 
-public class Pair<T1, T2> {
-  private final T1 v1;
-  private final T2 v2;
+public class Pair {
+  private final Object v1;
+  private final Object v2;
 
-  public Pair(T1 v1, T2 v2) {
+  public Pair(Object v1, Object v2) {
     this.v1 = v1;
     this.v2 = v2;
   }
 
-  public T1 first(){
+  public Object first() {
     return v1;
   }
 
-  public T2 second(){
+  public Object second() {
     return v2;
   }
 

@@ -17,14 +17,11 @@
 package org.whispersystems.libaxolotl.ratchet;
 
 
+import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.macs.HMac;
+import org.bouncycastle.crypto.params.KeyParameter;
 import org.whispersystems.libaxolotl.kdf.DerivedMessageSecrets;
 import org.whispersystems.libaxolotl.kdf.HKDF;
-
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 public class ChainKey {
 
@@ -63,13 +60,13 @@ public class ChainKey {
   }
 
   private byte[] getBaseMaterial(byte[] seed) {
-    try {
-      Mac mac = Mac.getInstance("HmacSHA256");
-      mac.init(new SecretKeySpec(key, "HmacSHA256"));
+    HMac   mac    = new HMac(new SHA256Digest());
+    byte[] output = new byte[mac.getMacSize()];
 
-      return mac.doFinal(seed);
-    } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-      throw new AssertionError(e);
-    }
+    mac.init(new KeyParameter(key, 0, key.length));
+    mac.update(seed, 0, seed.length);
+    mac.doFinal(output, 0);
+
+    return output;
   }
 }

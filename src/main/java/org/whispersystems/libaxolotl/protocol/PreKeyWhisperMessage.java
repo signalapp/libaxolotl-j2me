@@ -16,9 +16,6 @@
  */
 package org.whispersystems.libaxolotl.protocol;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-
 import org.whispersystems.libaxolotl.IdentityKey;
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.InvalidMessageException;
@@ -34,7 +31,7 @@ public class PreKeyWhisperMessage implements CiphertextMessage {
 
   private final int               version;
   private final int               registrationId;
-  private final Optional<Integer> preKeyId;
+  private final Optional          preKeyId;
   private final int               signedPreKeyId;
   private final ECPublicKey       baseKey;
   private final IdentityKey       identityKey;
@@ -51,32 +48,36 @@ public class PreKeyWhisperMessage implements CiphertextMessage {
         throw new InvalidVersionException("Unknown version: " + this.version);
       }
 
-      WhisperProtos.PreKeyWhisperMessage preKeyWhisperMessage
-          = WhisperProtos.PreKeyWhisperMessage.parseFrom(ByteString.copyFrom(serialized, 1,
-                                                                             serialized.length-1));
+      byte[] structureBytes = new byte[serialized.length - 1];
+      System.arraycopy(serialized, 1, structureBytes, 0, structureBytes.length);
 
-      if ((version == 2 && !preKeyWhisperMessage.hasPreKeyId())        ||
-          (version == 3 && !preKeyWhisperMessage.hasSignedPreKeyId())  ||
-          !preKeyWhisperMessage.hasBaseKey()                           ||
-          !preKeyWhisperMessage.hasIdentityKey()                       ||
-          !preKeyWhisperMessage.hasMessage())
+      org.whispersystems.libaxolotl.protocol.protos.PreKeyWhisperMessage structure
+          = org.whispersystems.libaxolotl.protocol.protos.PreKeyWhisperMessage.fromBytes(structureBytes);
+
+      if ((version == 2 && !structure.hasPrekeyid())        ||
+          (version == 3 && !structure.hasSignedprekeyid())  ||
+          !structure.hasBasekey()                           ||
+          !structure.hasIdentitykey()                       ||
+          !structure.hasMessage())
       {
         throw new InvalidMessageException("Incomplete message.");
       }
 
       this.serialized     = serialized;
-      this.registrationId = preKeyWhisperMessage.getRegistrationId();
-      this.preKeyId       = preKeyWhisperMessage.hasPreKeyId() ? Optional.of(preKeyWhisperMessage.getPreKeyId()) : Optional.<Integer>absent();
-      this.signedPreKeyId = preKeyWhisperMessage.hasSignedPreKeyId() ? preKeyWhisperMessage.getSignedPreKeyId() : -1;
-      this.baseKey        = Curve.decodePoint(preKeyWhisperMessage.getBaseKey().toByteArray(), 0);
-      this.identityKey    = new IdentityKey(Curve.decodePoint(preKeyWhisperMessage.getIdentityKey().toByteArray(), 0));
-      this.message        = new WhisperMessage(preKeyWhisperMessage.getMessage().toByteArray());
-    } catch (InvalidProtocolBufferException | InvalidKeyException | LegacyMessageException e) {
+      this.registrationId = structure.getRegistrationid();
+      this.preKeyId       = structure.hasPrekeyid() ? Optional.of(new Integer(structure.getPrekeyid())) : Optional.absent();
+      this.signedPreKeyId = structure.hasSignedprekeyid() ? structure.getSignedprekeyid() : -1;
+      this.baseKey        = Curve.decodePoint(structure.getBasekey(), 0);
+      this.identityKey    = new IdentityKey(Curve.decodePoint(structure.getIdentitykey(), 0));
+      this.message        = new WhisperMessage(structure.getMessage());
+    } catch (InvalidKeyException ike) {
+      throw new InvalidMessageException(ike);
+    } catch (LegacyMessageException e) {
       throw new InvalidMessageException(e);
     }
   }
 
-  public PreKeyWhisperMessage(int messageVersion, int registrationId, Optional<Integer> preKeyId,
+  public PreKeyWhisperMessage(int messageVersion, int registrationId, Optional preKeyId,
                               int signedPreKeyId, ECPublicKey baseKey, IdentityKey identityKey,
                               WhisperMessage message)
   {
@@ -88,20 +89,20 @@ public class PreKeyWhisperMessage implements CiphertextMessage {
     this.identityKey    = identityKey;
     this.message        = message;
 
-    WhisperProtos.PreKeyWhisperMessage.Builder builder =
-        WhisperProtos.PreKeyWhisperMessage.newBuilder()
-                                          .setSignedPreKeyId(signedPreKeyId)
-                                          .setBaseKey(ByteString.copyFrom(baseKey.serialize()))
-                                          .setIdentityKey(ByteString.copyFrom(identityKey.serialize()))
-                                          .setMessage(ByteString.copyFrom(message.serialize()))
-                                          .setRegistrationId(registrationId);
+    org.whispersystems.libaxolotl.protocol.protos.PreKeyWhisperMessage builder =
+        new org.whispersystems.libaxolotl.protocol.protos.PreKeyWhisperMessage();
+    builder.setSignedprekeyid(signedPreKeyId);
+    builder.setBasekey(baseKey.serialize());
+    builder.setIdentitykey(identityKey.serialize());
+    builder.setMessage(message.serialize());
+    builder.setRegistrationid(registrationId);
 
     if (preKeyId.isPresent()) {
-      builder.setPreKeyId(preKeyId.get());
+      builder.setPrekeyid(((Integer) preKeyId.get()).intValue());
     }
 
     byte[] versionBytes = {ByteUtil.intsToByteHighAndLow(this.version, CURRENT_VERSION)};
-    byte[] messageBytes = builder.build().toByteArray();
+    byte[] messageBytes = builder.toBytes();
 
     this.serialized = ByteUtil.combine(versionBytes, messageBytes);
   }
@@ -118,7 +119,7 @@ public class PreKeyWhisperMessage implements CiphertextMessage {
     return registrationId;
   }
 
-  public Optional<Integer> getPreKeyId() {
+  public Optional getPreKeyId() {
     return preKeyId;
   }
 
@@ -134,12 +135,12 @@ public class PreKeyWhisperMessage implements CiphertextMessage {
     return message;
   }
 
-  @Override
+//  @Override
   public byte[] serialize() {
     return serialized;
   }
 
-  @Override
+//  @Override
   public int getType() {
     return CiphertextMessage.PREKEY_TYPE;
   }

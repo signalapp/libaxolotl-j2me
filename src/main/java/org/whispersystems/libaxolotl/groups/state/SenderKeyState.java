@@ -1,7 +1,5 @@
 package org.whispersystems.libaxolotl.groups.state;
 
-import com.google.protobuf.ByteString;
-
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
@@ -9,20 +7,18 @@ import org.whispersystems.libaxolotl.ecc.ECPrivateKey;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
 import org.whispersystems.libaxolotl.groups.ratchet.SenderChainKey;
 import org.whispersystems.libaxolotl.groups.ratchet.SenderMessageKey;
+import org.whispersystems.libaxolotl.state.protos.SenderKeyStateStructure;
 import org.whispersystems.libaxolotl.util.guava.Optional;
 
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Vector;
 
-import static org.whispersystems.libaxolotl.state.StorageProtos.SenderKeyStateStructure;
 
 public class SenderKeyState {
 
   private SenderKeyStateStructure senderKeyStateStructure;
 
   public SenderKeyState(int id, int iteration, byte[] chainKey, ECPublicKey signatureKey) {
-    this(id, iteration, chainKey, signatureKey, Optional.<ECPrivateKey>absent());
+    this(id, iteration, chainKey, signatureKey, Optional.absent());
   }
 
   public SenderKeyState(int id, int iteration, byte[] chainKey, ECKeyPair signatureKey) {
@@ -31,27 +27,27 @@ public class SenderKeyState {
 
   private SenderKeyState(int id, int iteration, byte[] chainKey,
                         ECPublicKey signatureKeyPublic,
-                        Optional<ECPrivateKey> signatureKeyPrivate)
+                        Optional signatureKeyPrivate)
   {
     SenderKeyStateStructure.SenderChainKey senderChainKeyStructure =
-        SenderKeyStateStructure.SenderChainKey.newBuilder()
-                                              .setIteration(iteration)
-                                              .setSeed(ByteString.copyFrom(chainKey))
-                                              .build();
+        new SenderKeyStateStructure.SenderChainKey();
 
-    SenderKeyStateStructure.SenderSigningKey.Builder signingKeyStructure =
-        SenderKeyStateStructure.SenderSigningKey.newBuilder()
-                                                .setPublic(ByteString.copyFrom(signatureKeyPublic.serialize()));
+    senderChainKeyStructure.setIteration(iteration);
+    senderChainKeyStructure.setSeed(chainKey);
+
+    SenderKeyStateStructure.SenderSigningKey signingKeyStructure =
+        new SenderKeyStateStructure.SenderSigningKey();
+
+    signingKeyStructure.setPublic(signatureKeyPublic.serialize());
 
     if (signatureKeyPrivate.isPresent()) {
-      signingKeyStructure.setPrivate(ByteString.copyFrom(signatureKeyPrivate.get().serialize()));
+      signingKeyStructure.setPrivate(((ECPrivateKey)signatureKeyPrivate.get()).serialize());
     }
 
-    this.senderKeyStateStructure = SenderKeyStateStructure.newBuilder()
-                                                          .setSenderKeyId(id)
-                                                          .setSenderChainKey(senderChainKeyStructure)
-                                                          .setSenderSigningKey(signingKeyStructure)
-                                                          .build();
+    this.senderKeyStateStructure = new SenderKeyStateStructure();
+    this.senderKeyStateStructure.setSenderkeyid(id);
+    this.senderKeyStateStructure.setSenderchainkey(senderChainKeyStructure);
+    this.senderKeyStateStructure.setSendersigningkey(signingKeyStructure);
   }
 
   public SenderKeyState(SenderKeyStateStructure senderKeyStateStructure) {
@@ -59,39 +55,37 @@ public class SenderKeyState {
   }
 
   public int getKeyId() {
-    return senderKeyStateStructure.getSenderKeyId();
+    return senderKeyStateStructure.getSenderkeyid();
   }
 
   public SenderChainKey getSenderChainKey() {
-    return new SenderChainKey(senderKeyStateStructure.getSenderChainKey().getIteration(),
-                              senderKeyStateStructure.getSenderChainKey().getSeed().toByteArray());
+    return new SenderChainKey(senderKeyStateStructure.getSenderchainkey().getIteration(),
+                              senderKeyStateStructure.getSenderchainkey().getSeed());
   }
 
   public void setSenderChainKey(SenderChainKey chainKey) {
     SenderKeyStateStructure.SenderChainKey senderChainKeyStructure =
-        SenderKeyStateStructure.SenderChainKey.newBuilder()
-                                              .setIteration(chainKey.getIteration())
-                                              .setSeed(ByteString.copyFrom(chainKey.getSeed()))
-                                              .build();
+        new SenderKeyStateStructure.SenderChainKey();
 
-    this.senderKeyStateStructure = senderKeyStateStructure.toBuilder()
-                                                          .setSenderChainKey(senderChainKeyStructure)
-                                                          .build();
+    senderChainKeyStructure.setIteration(chainKey.getIteration());
+    senderChainKeyStructure.setSeed(chainKey.getSeed());
+
+    this.senderKeyStateStructure.setSenderchainkey(senderChainKeyStructure);
   }
 
   public ECPublicKey getSigningKeyPublic() throws InvalidKeyException {
-    return Curve.decodePoint(senderKeyStateStructure.getSenderSigningKey()
-                                                    .getPublic()
-                                                    .toByteArray(), 0);
+    return Curve.decodePoint(senderKeyStateStructure.getSendersigningkey()
+                                                    .getPublic(), 0);
   }
 
   public ECPrivateKey getSigningKeyPrivate() {
-    return Curve.decodePrivatePoint(senderKeyStateStructure.getSenderSigningKey()
-                                                           .getPrivate().toByteArray());
+    return Curve.decodePrivatePoint(senderKeyStateStructure.getSendersigningkey()
+                                                           .getPrivate());
   }
 
   public boolean hasSenderMessageKey(int iteration) {
-    for (SenderKeyStateStructure.SenderMessageKey senderMessageKey : senderKeyStateStructure.getSenderMessageKeysList()) {
+    for (int i=0;i<senderKeyStateStructure.getSendermessagekeysVector().size();i++) {
+      SenderKeyStateStructure.SenderMessageKey senderMessageKey = (SenderKeyStateStructure.SenderMessageKey)senderKeyStateStructure.getSendermessagekeysVector().elementAt(i);
       if (senderMessageKey.getIteration() == iteration) return true;
     }
 
@@ -100,39 +94,46 @@ public class SenderKeyState {
 
   public void addSenderMessageKey(SenderMessageKey senderMessageKey) {
     SenderKeyStateStructure.SenderMessageKey senderMessageKeyStructure =
-        SenderKeyStateStructure.SenderMessageKey.newBuilder()
-                                                .setIteration(senderMessageKey.getIteration())
-                                                .setSeed(ByteString.copyFrom(senderMessageKey.getSeed()))
-                                                .build();
+        new SenderKeyStateStructure.SenderMessageKey();
 
-    this.senderKeyStateStructure = this.senderKeyStateStructure.toBuilder()
-                                                               .addSenderMessageKeys(senderMessageKeyStructure)
-                                                               .build();
+    senderMessageKeyStructure.setIteration(senderMessageKey.getIteration());
+    senderMessageKeyStructure.setSeed(senderMessageKey.getSeed());
+
+    this.senderKeyStateStructure.addSendermessagekeys(senderMessageKeyStructure);
+//
+//    this.senderKeyStateStructure = this.senderKeyStateStructure.toBuilder()
+//                                                               .addSenderMessageKeys(senderMessageKeyStructure)
+//                                                               .build();
   }
 
   public SenderMessageKey removeSenderMessageKey(int iteration) {
-    List<SenderKeyStateStructure.SenderMessageKey>     keys     = new LinkedList<>(senderKeyStateStructure.getSenderMessageKeysList());
-    Iterator<SenderKeyStateStructure.SenderMessageKey> iterator = keys.iterator();
+    Vector keys = senderKeyStateStructure.getSendermessagekeysVector();
+//
+//
+//    List<SenderKeyStateStructure.SenderMessageKey>     keys     = new LinkedList<>(senderKeyStateStructure.getSenderMessageKeysList());
+//    Iterator<SenderKeyStateStructure.SenderMessageKey> iterator = keys.iterator();
 
     SenderKeyStateStructure.SenderMessageKey result = null;
 
-    while (iterator.hasNext()) {
-      SenderKeyStateStructure.SenderMessageKey senderMessageKey = iterator.next();
+    for (int i=0;i<keys.size();i++) {
+      SenderKeyStateStructure.SenderMessageKey senderMessageKey = (SenderKeyStateStructure.SenderMessageKey)keys.elementAt(i);
 
       if (senderMessageKey.getIteration() == iteration) {
         result = senderMessageKey;
-        iterator.remove();
+        keys.removeElementAt(i);
+//        iterator.remove();
         break;
       }
     }
 
-    this.senderKeyStateStructure = this.senderKeyStateStructure.toBuilder()
-                                                               .clearSenderMessageKeys()
-                                                               .addAllSenderMessageKeys(keys)
-                                                               .build();
+
+//    this.senderKeyStateStructure = this.senderKeyStateStructure.toBuilder()
+//                                                               .clearSenderMessageKeys()
+//                                                               .addAllSenderMessageKeys(keys)
+//                                                               .build();
 
     if (result != null) {
-      return new SenderMessageKey(result.getIteration(), result.getSeed().toByteArray());
+      return new SenderMessageKey(result.getIteration(), result.getSeed());
     } else {
       return null;
     }

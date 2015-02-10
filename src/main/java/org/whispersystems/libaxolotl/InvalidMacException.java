@@ -16,7 +16,9 @@
  */
 package org.whispersystems.libaxolotl;
 
-public class InvalidMacException extends Exception {
+import org.whispersystems.libaxolotl.j2me.NestedException;
+
+public class InvalidMacException extends NestedException {
 
   public InvalidMacException(String detailMessage) {
     super(detailMessage);

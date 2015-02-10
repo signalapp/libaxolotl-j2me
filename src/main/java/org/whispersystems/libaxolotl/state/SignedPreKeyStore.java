@@ -2,7 +2,7 @@ package org.whispersystems.libaxolotl.state;
 
 import org.whispersystems.libaxolotl.InvalidKeyIdException;
 
-import java.util.List;
+import java.util.Vector;
 
 public interface SignedPreKeyStore {
 
@@ -21,7 +21,7 @@ public interface SignedPreKeyStore {
    *
    * @return All stored SignedPreKeyRecords.
    */
-  public List<SignedPreKeyRecord> loadSignedPreKeys();
+  public Vector loadSignedPreKeys();
 
   /**
    * Store a local SignedPreKeyRecord.

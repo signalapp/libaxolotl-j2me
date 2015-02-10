@@ -16,6 +16,15 @@
  */
 package org.whispersystems.libaxolotl;
 
+import org.bouncycastle.crypto.BufferedBlockCipher;
+import org.bouncycastle.crypto.InvalidCipherTextException;
+import org.bouncycastle.crypto.engines.AESEngine;
+import org.bouncycastle.crypto.modes.CBCBlockCipher;
+import org.bouncycastle.crypto.modes.SICBlockCipher;
+import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
+import org.bouncycastle.crypto.params.KeyParameter;
+import org.bouncycastle.crypto.params.ParametersWithIV;
+import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
@@ -32,24 +41,12 @@ import org.whispersystems.libaxolotl.state.SessionRecord;
 import org.whispersystems.libaxolotl.state.SessionState;
 import org.whispersystems.libaxolotl.state.SessionStore;
 import org.whispersystems.libaxolotl.state.SignedPreKeyStore;
+import org.whispersystems.libaxolotl.j2me.AssertionError;
 import org.whispersystems.libaxolotl.util.ByteUtil;
 import org.whispersystems.libaxolotl.util.Pair;
 import org.whispersystems.libaxolotl.util.guava.Optional;
 
-import java.security.InvalidAlgorithmParameterException;
-import java.security.NoSuchAlgorithmException;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-
-import static org.whispersystems.libaxolotl.state.SessionState.UnacknowledgedPreKeyMessageItems;
+import java.util.Vector;
 
 /**
  * The main entry point for Axolotl encrypt/decrypt operations.
@@ -64,11 +61,12 @@ public class SessionCipher {
 
   public static final Object SESSION_LOCK = new Object();
 
-  private final SessionStore   sessionStore;
-  private final SessionBuilder sessionBuilder;
-  private final PreKeyStore    preKeyStore;
-  private final long           recipientId;
-  private final int            deviceId;
+  private final SecureRandomProvider secureRandomProvider;
+  private final SessionStore         sessionStore;
+  private final SessionBuilder       sessionBuilder;
+  private final PreKeyStore          preKeyStore;
+  private final long                 recipientId;
+  private final int                  deviceId;
 
   /**
    * Construct a SessionCipher for encrypt/decrypt operations on a session.
@@ -79,20 +77,23 @@ public class SessionCipher {
    * @param  recipientId  The remote ID that messages will be encrypted to or decrypted from.
    * @param  deviceId     The device corresponding to the recipientId.
    */
-  public SessionCipher(SessionStore sessionStore, PreKeyStore preKeyStore,
+  public SessionCipher(SecureRandomProvider secureRandomProvider,
+                       SessionStore sessionStore, PreKeyStore preKeyStore,
                        SignedPreKeyStore signedPreKeyStore, IdentityKeyStore identityKeyStore,
                        long recipientId, int deviceId)
   {
-    this.sessionStore   = sessionStore;
-    this.recipientId    = recipientId;
-    this.deviceId       = deviceId;
-    this.preKeyStore    = preKeyStore;
-    this.sessionBuilder = new SessionBuilder(sessionStore, preKeyStore, signedPreKeyStore,
-                                             identityKeyStore, recipientId, deviceId);
+    this.secureRandomProvider = secureRandomProvider;
+    this.sessionStore         = sessionStore;
+    this.recipientId          = recipientId;
+    this.deviceId             = deviceId;
+    this.preKeyStore          = preKeyStore;
+    this.sessionBuilder       = new SessionBuilder(secureRandomProvider,
+                                                   sessionStore, preKeyStore, signedPreKeyStore,
+                                                   identityKeyStore, recipientId, deviceId);
   }
 
-  public SessionCipher(AxolotlStore store, long recipientId, int deviceId) {
-    this(store, store, store, store, recipientId, deviceId);
+  public SessionCipher(SecureRandomProvider secureRandomProvider, AxolotlStore store, long recipientId, int deviceId) {
+    this(secureRandomProvider, store, store, store, store, recipientId, deviceId);
   }
 
   /**
@@ -119,8 +120,8 @@ public class SessionCipher {
                                                                sessionState.getRemoteIdentityKey());
 
       if (sessionState.hasUnacknowledgedPreKeyMessage()) {
-        UnacknowledgedPreKeyMessageItems items = sessionState.getUnacknowledgedPreKeyMessageItems();
-        int localRegistrationId = sessionState.getLocalRegistrationId();
+        SessionState.UnacknowledgedPreKeyMessageItems items               = sessionState.getUnacknowledgedPreKeyMessageItems();
+        int                                           localRegistrationId = sessionState.getLocalRegistrationId();
 
         ciphertextMessage = new PreKeyWhisperMessage(sessionVersion, localRegistrationId, items.getPreKeyId(),
                                                      items.getSignedPreKeyId(), items.getBaseKey(),
@@ -183,7 +184,7 @@ public class SessionCipher {
   {
     synchronized (SESSION_LOCK) {
       SessionRecord     sessionRecord    = sessionStore.loadSession(recipientId, deviceId);
-      Optional<Integer> unsignedPreKeyId = sessionBuilder.process(sessionRecord, ciphertext);
+      Optional          unsignedPreKeyId = sessionBuilder.process(sessionRecord, ciphertext);
       byte[]            plaintext        = decrypt(sessionRecord, ciphertext.getWhisperMessage());
 
       callback.handlePlaintext(plaintext);
@@ -191,7 +192,7 @@ public class SessionCipher {
       sessionStore.storeSession(recipientId, deviceId, sessionRecord);
 
       if (unsignedPreKeyId.isPresent()) {
-        preKeyStore.removePreKey(unsignedPreKeyId.get());
+        preKeyStore.removePreKey(((Integer)unsignedPreKeyId.get()).intValue());
       }
 
       return plaintext;
@@ -260,8 +261,8 @@ public class SessionCipher {
       throws DuplicateMessageException, LegacyMessageException, InvalidMessageException
   {
     synchronized (SESSION_LOCK) {
-      Iterator<SessionState> previousStates = sessionRecord.getPreviousSessionStates().iterator();
-      List<Exception>        exceptions     = new LinkedList<>();
+      Vector previousStates = sessionRecord.getPreviousSessionStates();
+      Vector exceptions     = new Vector();
 
       try {
         SessionState sessionState = new SessionState(sessionRecord.getSessionState());
@@ -270,20 +271,20 @@ public class SessionCipher {
         sessionRecord.setState(sessionState);
         return plaintext;
       } catch (InvalidMessageException e) {
-        exceptions.add(e);
+        exceptions.addElement(e);
       }
 
-      while (previousStates.hasNext()) {
+      for (int i=0;i<previousStates.size();i++) {
         try {
-          SessionState promotedState = new SessionState(previousStates.next());
+          SessionState promotedState = new SessionState((SessionState)previousStates.elementAt(i));
           byte[]       plaintext     = decrypt(promotedState, ciphertext);
 
-          previousStates.remove();
+          previousStates.removeElementAt(i);
           sessionRecord.promoteState(promotedState);
 
           return plaintext;
         } catch (InvalidMessageException e) {
-          exceptions.add(e);
+          exceptions.addElement(e);
         }
       }
 
@@ -299,9 +300,7 @@ public class SessionCipher {
     }
 
     if (ciphertextMessage.getMessageVersion() != sessionState.getSessionVersion()) {
-      throw new InvalidMessageException(String.format("Message version %d, but session version %d",
-                                                      ciphertextMessage.getMessageVersion(),
-                                                      sessionState.getSessionVersion()));
+      throw new InvalidMessageException("Message version: " + ciphertextMessage.getMessageVersion() + ", but session version: " + sessionState.getSessionVersion());
     }
 
     int            messageVersion    = ciphertextMessage.getMessageVersion();
@@ -333,7 +332,7 @@ public class SessionCipher {
   public int getSessionVersion() {
     synchronized (SESSION_LOCK) {
       if (!sessionStore.containsSession(recipientId, deviceId)) {
-        throw new IllegalStateException(String.format("No session for (%d, %d)!", recipientId, deviceId));
+        throw new IllegalStateException("No session for (" + recipientId + "," + deviceId + ")");
       }
 
       SessionRecord record = sessionStore.loadSession(recipientId, deviceId);
@@ -348,18 +347,18 @@ public class SessionCipher {
       if (sessionState.hasReceiverChain(theirEphemeral)) {
         return sessionState.getReceiverChainKey(theirEphemeral);
       } else {
-        RootKey                 rootKey         = sessionState.getRootKey();
-        ECKeyPair               ourEphemeral    = sessionState.getSenderRatchetKeyPair();
-        Pair<RootKey, ChainKey> receiverChain   = rootKey.createChain(theirEphemeral, ourEphemeral);
-        ECKeyPair               ourNewEphemeral = Curve.generateKeyPair();
-        Pair<RootKey, ChainKey> senderChain     = receiverChain.first().createChain(theirEphemeral, ourNewEphemeral);
+        RootKey   rootKey         = sessionState.getRootKey();
+        ECKeyPair ourEphemeral    = sessionState.getSenderRatchetKeyPair();
+        Pair      receiverChain   = rootKey.createChain(theirEphemeral, ourEphemeral);
+        ECKeyPair ourNewEphemeral = Curve.generateKeyPair(secureRandomProvider);
+        Pair      senderChain     = ((RootKey)receiverChain.first()).createChain(theirEphemeral, ourNewEphemeral);
 
-        sessionState.setRootKey(senderChain.first());
-        sessionState.addReceiverChain(theirEphemeral, receiverChain.second());
+        sessionState.setRootKey((RootKey)senderChain.first());
+        sessionState.addReceiverChain(theirEphemeral, (ChainKey)receiverChain.second());
         sessionState.setPreviousCounter(Math.max(sessionState.getSenderChainKey().getIndex()-1, 0));
-        sessionState.setSenderChain(ourNewEphemeral, senderChain.second());
+        sessionState.setSenderChain(ourNewEphemeral, (ChainKey)senderChain.second());
 
-        return receiverChain.second();
+        return (ChainKey)receiverChain.second();
       }
     } catch (InvalidKeyException e) {
       throw new InvalidMessageException(e);
@@ -396,16 +395,26 @@ public class SessionCipher {
 
   private byte[] getCiphertext(int version, MessageKeys messageKeys, byte[] plaintext) {
     try {
-      Cipher cipher;
+      BufferedBlockCipher cipher;
 
       if (version >= 3) {
-        cipher = getCipher(Cipher.ENCRYPT_MODE, messageKeys.getCipherKey(), messageKeys.getIv());
+        cipher = getCipher(true, new ParametersWithIV(messageKeys.getCipherKey(), messageKeys.getIv().getIV()));
       } else {
-        cipher = getCipher(Cipher.ENCRYPT_MODE, messageKeys.getCipherKey(), messageKeys.getCounter());
+        cipher = getCipher(true, messageKeys.getCipherKey(), messageKeys.getCounter());
       }
 
-      return cipher.doFinal(plaintext);
-    } catch (IllegalBlockSizeException | BadPaddingException e) {
+      byte[] output    = new byte[cipher.getOutputSize(plaintext.length)];
+      int    processed = cipher.processBytes(plaintext, 0, plaintext.length, output, 0);
+      int    finished  = cipher.doFinal(output, processed);
+
+      if (processed + finished < output.length) {
+        byte[] trimmed = new byte[processed + finished];
+        System.arraycopy(output, 0, trimmed, 0, trimmed.length);
+        return trimmed;
+      } else {
+        return output;
+      }
+    } catch (InvalidCipherTextException e) {
       throw new AssertionError(e);
     }
   }
@@ -414,48 +423,55 @@ public class SessionCipher {
       throws InvalidMessageException
   {
     try {
-      Cipher cipher;
+      BufferedBlockCipher cipher;
 
       if (version >= 3) {
-        cipher = getCipher(Cipher.DECRYPT_MODE, messageKeys.getCipherKey(), messageKeys.getIv());
+        cipher = getCipher(false, new ParametersWithIV(messageKeys.getCipherKey(), messageKeys.getIv().getIV()));
       } else {
-        cipher = getCipher(Cipher.DECRYPT_MODE, messageKeys.getCipherKey(), messageKeys.getCounter());
+        cipher = getCipher(false, messageKeys.getCipherKey(), messageKeys.getCounter());
       }
 
-      return cipher.doFinal(cipherText);
-    } catch (IllegalBlockSizeException | BadPaddingException e) {
-      throw new InvalidMessageException(e);
+      byte[] output    = new byte[cipher.getOutputSize(cipherText.length)];
+      int    processed = cipher.processBytes(cipherText, 0, cipherText.length, output, 0);
+      int    finished  = cipher.doFinal(output, processed);
+
+      if (processed + finished < output.length) {
+        byte[] trimmed = new byte[processed + finished];
+        System.arraycopy(output, 0, trimmed, 0, trimmed.length);
+        return trimmed;
+      } else {
+        return output;
+      }
+
+    } catch (InvalidCipherTextException icte) {
+      throw new InvalidMessageException(icte);
     }
   }
 
-  private Cipher getCipher(int mode, SecretKeySpec key, int counter)  {
-    try {
-      Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
+  private BufferedBlockCipher getCipher(boolean encrypt, KeyParameter key, int counter)  {
+    byte[] ivBytes = new byte[16];
+    ByteUtil.intToByteArray(ivBytes, 0, counter);
 
-      byte[] ivBytes = new byte[16];
-      ByteUtil.intToByteArray(ivBytes, 0, counter);
+    BufferedBlockCipher cipher = new BufferedBlockCipher(new SICBlockCipher(new AESEngine()));
+    cipher.init(encrypt, new ParametersWithIV(key, ivBytes));
 
-      IvParameterSpec iv = new IvParameterSpec(ivBytes);
-      cipher.init(mode, key, iv);
-
-      return cipher;
-    } catch (NoSuchAlgorithmException | NoSuchPaddingException | java.security.InvalidKeyException |
-             InvalidAlgorithmParameterException e)
-    {
-      throw new AssertionError(e);
-    }
+    return cipher;
   }
 
-  private Cipher getCipher(int mode, SecretKeySpec key, IvParameterSpec iv) {
-    try {
-      Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-      cipher.init(mode, key, iv);
-      return cipher;
-    } catch (NoSuchAlgorithmException | NoSuchPaddingException | java.security.InvalidKeyException |
-             InvalidAlgorithmParameterException e)
-    {
-      throw new AssertionError(e);
-    }
+  private PaddedBufferedBlockCipher getCipher(boolean encrypt, ParametersWithIV iv) {
+    PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
+    cipher.init(encrypt, iv);
+
+    return cipher;
+//    try {
+//      Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+//      cipher.init(mode, key, iv);
+//      return cipher;
+//    } catch (NoSuchAlgorithmException | NoSuchPaddingException | java.security.InvalidKeyException |
+//             InvalidAlgorithmParameterException e)
+//    {
+//      throw new AssertionError(e);
+//    }
   }
 
   public static interface DecryptionCallback {
@@ -463,7 +479,7 @@ public class SessionCipher {
   }
 
   private static class NullDecryptionCallback implements DecryptionCallback {
-    @Override
+//    @Override
     public void handlePlaintext(byte[] plaintext) {}
   }
 }

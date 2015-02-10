@@ -16,73 +16,66 @@
 
 package org.whispersystems.libaxolotl.util.guava;
 
-import static org.whispersystems.libaxolotl.util.guava.Preconditions.checkNotNull;
-
-import java.util.Collections;
-import java.util.Set;
-
 /**
  * Implementation of an {@link Optional} containing a reference.
  */
 
-final class Present<T> extends Optional<T> {
-  private final T reference;
+final class Present extends Optional {
+  private final Object reference;
 
-  Present(T reference) {
+  Present(Object reference) {
     this.reference = reference;
   }
 
-  @Override public boolean isPresent() {
+  public boolean isPresent() {
     return true;
   }
 
-  @Override public T get() {
+  public Object get() {
     return reference;
   }
 
-  @Override public T or(T defaultValue) {
-    checkNotNull(defaultValue, "use orNull() instead of or(null)");
+  public Object or(Object defaultValue) {
+    Preconditions.checkNotNull(defaultValue, "use orNull() instead of or(null)");
     return reference;
   }
 
-  @Override public Optional<T> or(Optional<? extends T> secondChoice) {
-    checkNotNull(secondChoice);
+  public Optional or(Optional secondChoice) {
+    Preconditions.checkNotNull(secondChoice);
     return this;
   }
 
-  @Override public T or(Supplier<? extends T> supplier) {
-    checkNotNull(supplier);
+  public Object or(Supplier supplier) {
+    Preconditions.checkNotNull(supplier);
     return reference;
   }
 
-  @Override public T orNull() {
+  public Object orNull() {
     return reference;
   }
 
-  @Override public Set<T> asSet() {
-    return Collections.singleton(reference);
-  }
+//  public Set<T> asSet() {
+//    return Collections.singleton(reference);
+//  }
   
-  @Override public <V> Optional<V> transform(Function<? super T, V> function) {
-    return new Present<V>(checkNotNull(function.apply(reference),
-        "Transformation function cannot return null."));
-  }
+//  public Optional<V> transform(Function<? super T, V> function) {
+//    return new Present<V>(checkNotNull(function.apply(reference),
+//        "Transformation function cannot return null."));
+//  }
 
-  @Override public boolean equals(Object object) {
+  public boolean equals(Object object) {
     if (object instanceof Present) {
-      Present<?> other = (Present<?>) object;
+      Present other = (Present) object;
       return reference.equals(other.reference);
     }
     return false;
   }
 
-  @Override public int hashCode() {
+  public int hashCode() {
     return 0x598df91c + reference.hashCode();
   }
 
-  @Override public String toString() {
+  public String toString() {
     return "Optional.of(" + reference + ")";
   }
-
-  private static final long serialVersionUID = 0;
 }
