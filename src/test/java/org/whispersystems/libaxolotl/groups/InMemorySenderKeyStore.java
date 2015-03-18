@@ -9,18 +9,16 @@ import java.util.Hashtable;
 
 public class InMemorySenderKeyStore implements SenderKeyStore {
 
+  // SenderKeyName -> SenderKeyRecord
   private final Hashtable store = new Hashtable();
-//  private final Map<String, SenderKeyRecord> store = new HashMap<>();
 
-//  @Override
-  public void storeSenderKey(String senderKeyId, SenderKeyRecord record) {
-    store.put(senderKeyId, record);
+  public void storeSenderKey(SenderKeyName senderKeyName, SenderKeyRecord record) {
+    store.put(senderKeyName, record);
   }
 
-//  @Override
-  public SenderKeyRecord loadSenderKey(String senderKeyId) {
+  public SenderKeyRecord loadSenderKey(SenderKeyName senderKeyName) {
     try {
-      SenderKeyRecord record = (SenderKeyRecord)store.get(senderKeyId);
+      SenderKeyRecord record = (SenderKeyRecord)store.get(senderKeyName);
 
       if (record == null) {
         return new SenderKeyRecord();
