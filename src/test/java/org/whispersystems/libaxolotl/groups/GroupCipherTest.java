@@ -131,6 +131,39 @@ public class GroupCipherTest extends TestCase {
     }
   }
 
+  public void testLateJoin() throws NoSessionException, InvalidMessageException, LegacyMessageException, DuplicateMessageException {
+    InMemorySenderKeyStore aliceStore = new InMemorySenderKeyStore();
+    InMemorySenderKeyStore bobStore   = new InMemorySenderKeyStore();
+
+    GroupSessionBuilder aliceSessionBuilder = new GroupSessionBuilder(aliceStore);
+
+
+    SenderKeyName aliceName = GROUP_SENDER;
+
+    GroupCipher aliceGroupCipher = new GroupCipher(new FakeSecureRandomProvider(), aliceStore, aliceName);
+
+
+    SenderKeyDistributionMessage aliceDistributionMessage = aliceSessionBuilder.create(aliceName, new FakeSecureRandomProvider());
+    // Send off to some people.
+
+    for (int i=0;i<100;i++) {
+      aliceGroupCipher.encrypt("up the punks up the punks up the punks".getBytes());
+    }
+
+    // Now Bob Joins.
+    GroupSessionBuilder bobSessionBuilder = new GroupSessionBuilder(bobStore);
+    GroupCipher         bobGroupCipher    = new GroupCipher(new FakeSecureRandomProvider(), bobStore, aliceName);
+
+
+    SenderKeyDistributionMessage distributionMessageToBob = aliceSessionBuilder.create(aliceName, new FakeSecureRandomProvider());
+    bobSessionBuilder.process(aliceName, new SenderKeyDistributionMessage(distributionMessageToBob.serialize()));
+
+    byte[] ciphertext = aliceGroupCipher.encrypt("welcome to the group".getBytes());
+    byte[] plaintext  = bobGroupCipher.decrypt(ciphertext);
+
+    assertEquals(new String(plaintext), "welcome to the group");
+  }
+
   private int randomInt() {
     return new FakeSecureRandomProvider().nextInt(Integer.MAX_VALUE);
   }

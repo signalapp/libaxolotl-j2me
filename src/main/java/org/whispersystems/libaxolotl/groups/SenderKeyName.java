@@ -55,6 +55,9 @@ public class SenderKeyName {
   }
 
   public int hashCode() {
-    return this.groupId.hashCode() ^ this.sender.hashCode();
+    int hash = 7;
+    hash = 31 * hash + groupId.hashCode();
+    hash = 31 * hash + sender.hashCode();
+    return hash;
   }
 }

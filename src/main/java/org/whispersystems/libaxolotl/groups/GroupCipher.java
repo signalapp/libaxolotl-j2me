@@ -35,8 +35,8 @@ import org.whispersystems.libaxolotl.groups.ratchet.SenderMessageKey;
 import org.whispersystems.libaxolotl.groups.state.SenderKeyRecord;
 import org.whispersystems.libaxolotl.groups.state.SenderKeyState;
 import org.whispersystems.libaxolotl.groups.state.SenderKeyStore;
-import org.whispersystems.libaxolotl.protocol.SenderKeyMessage;
 import org.whispersystems.libaxolotl.j2me.AssertionError;
+import org.whispersystems.libaxolotl.protocol.SenderKeyMessage;
 
 import java.io.IOException;
 
@@ -78,7 +78,6 @@ public class GroupCipher {
         SenderKeyState   senderKeyState = record.getSenderKeyState();
         SenderMessageKey senderKey      = senderKeyState.getSenderChainKey().getSenderMessageKey();
         byte[]           ciphertext     = getCipherText(senderKey.getIv(), senderKey.getCipherKey(), paddedPlaintext);
-
         SenderKeyMessage senderKeyMessage = new SenderKeyMessage(secureRandomProvider,
                                                                  senderKeyState.getKeyId(),
                                                                  senderKey.getIteration(),
@@ -108,7 +107,6 @@ public class GroupCipher {
         senderKeyMessage.verifySignature(senderKeyState.getSigningKeyPublic());
 
         SenderMessageKey senderKey = getSenderKey(senderKeyState, senderKeyMessage.getIteration());
-
         byte[] plaintext = getPlainText(senderKey.getIv(), senderKey.getCipherKey(), senderKeyMessage.getCipherText());
 
         senderKeyStore.storeSenderKey(senderKeyId, record);
@@ -180,7 +178,7 @@ public class GroupCipher {
 
     byte[] buffer    = new byte[cipher.getOutputSize(input.length)];
     int    processed = cipher.processBytes(input, 0, input.length, buffer, 0);
-    int    finished  = cipher.doFinal(buffer, 0);
+    int    finished  = cipher.doFinal(buffer, processed);
 
     if (processed + finished < buffer.length) {
       byte[] trimmed = new byte[processed + finished];
