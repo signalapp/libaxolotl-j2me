@@ -10,7 +10,7 @@ import java.util.Hashtable;
 public class InMemoryIdentityKeyStore implements IdentityKeyStore {
 
   private final Hashtable trustedKeys = new Hashtable();
-//  private final Map<Long, IdentityKey> trustedKeys = new HashMap<>();
+//  private final Map<String, IdentityKey> trustedKeys = new HashMap<>();
 
   private final IdentityKeyPair identityKeyPair;
   private final int             localRegistrationId;
@@ -34,13 +34,13 @@ public class InMemoryIdentityKeyStore implements IdentityKeyStore {
   }
 
 //  @Override
-  public void saveIdentity(long recipientId, IdentityKey identityKey) {
-    trustedKeys.put(new Long(recipientId), identityKey);
+  public void saveIdentity(String name, IdentityKey identityKey) {
+    trustedKeys.put(name, identityKey);
   }
 
 //  @Override
-  public boolean isTrustedIdentity(long recipientId, IdentityKey identityKey) {
-    IdentityKey trusted = (IdentityKey)trustedKeys.get(new Long(recipientId));
+  public boolean isTrustedIdentity(String name, IdentityKey identityKey) {
+    IdentityKey trusted = (IdentityKey)trustedKeys.get(name);
     return (trusted == null || trusted.equals(identityKey));
   }
 }

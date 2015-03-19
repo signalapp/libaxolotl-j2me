@@ -55,11 +55,11 @@ public class SessionCipherTest extends TestCase {
     AxolotlStore aliceStore = new InMemoryAxolotlStore();
     AxolotlStore bobStore   = new InMemoryAxolotlStore();
 
-    aliceStore.storeSession(2L, 1, aliceSessionRecord);
-    bobStore.storeSession(3L, 1, bobSessionRecord);
+    aliceStore.storeSession(new AxolotlAddress("+14159999999", 1), aliceSessionRecord);
+    bobStore.storeSession(new AxolotlAddress("+14158888888", 1), bobSessionRecord);
 
-    SessionCipher     aliceCipher    = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, 2L, 1);
-    SessionCipher     bobCipher      = new SessionCipher(new FakeSecureRandomProvider(), bobStore, 3L, 1);
+    SessionCipher     aliceCipher    = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, new AxolotlAddress("+14159999999", 1));
+    SessionCipher     bobCipher      = new SessionCipher(new FakeSecureRandomProvider(), bobStore, new AxolotlAddress("+14158888888", 1));
 
     byte[]            alicePlaintext = "This is a plaintext message.".getBytes();
     CiphertextMessage message        = aliceCipher.encrypt(alicePlaintext);

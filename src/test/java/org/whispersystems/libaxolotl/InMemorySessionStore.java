@@ -13,15 +13,15 @@ import java.util.Vector;
 public class InMemorySessionStore implements SessionStore {
 
   private Hashtable sessions = new Hashtable();
-//  private Map<Pair<Long, Integer>, byte[]> sessions = new HashMap<>();
+//  private Map<AxolotlAddress, byte[]> sessions = new HashMap<>();
 
   public InMemorySessionStore() {}
 
 //  @Override
-  public synchronized SessionRecord loadSession(long recipientId, int deviceId) {
+  public synchronized SessionRecord loadSession(AxolotlAddress address) {
     try {
-      if (containsSession(recipientId, deviceId)) {
-        return new SessionRecord((byte[])sessions.get(new Pair(new Long(recipientId), new Integer(deviceId))));
+      if (containsSession(address)) {
+        return new SessionRecord((byte[])sessions.get(address));
       } else {
         return new SessionRecord();
       }
@@ -31,15 +31,15 @@ public class InMemorySessionStore implements SessionStore {
   }
 
 //  @Override
-  public synchronized Vector getSubDeviceSessions(long recipientId) {
+  public synchronized Vector getSubDeviceSessions(String name) {
     Vector      deviceIds = new Vector();
     Enumeration keys      = sessions.keys();
 
     while (keys.hasMoreElements()) {
-      Pair key = (Pair)keys.nextElement();
+      AxolotlAddress key = (AxolotlAddress)keys.nextElement();
 
-      if (((Long)key.first()).longValue() == recipientId) {
-        deviceIds.addElement((Integer)key.second());
+      if (key.getName().equals(name)) {
+        deviceIds.addElement(new Long(key.getDeviceId()));
       }
     }
 
@@ -47,28 +47,28 @@ public class InMemorySessionStore implements SessionStore {
   }
 
 //  @Override
-  public synchronized void storeSession(long recipientId, int deviceId, SessionRecord record) {
-    sessions.put(new Pair(new Long(recipientId), new Integer(deviceId)), record.serialize());
+  public synchronized void storeSession(AxolotlAddress address, SessionRecord record) {
+    sessions.put(address, record.serialize());
   }
 
 //  @Override
-  public synchronized boolean containsSession(long recipientId, int deviceId) {
-    return sessions.containsKey(new Pair(new Long(recipientId), new Integer(deviceId)));
+  public synchronized boolean containsSession(AxolotlAddress address) {
+    return sessions.containsKey(address);
   }
 
 //  @Override
-  public synchronized void deleteSession(long recipientId, int deviceId) {
-    sessions.remove(new Pair(new Long(recipientId), new Integer(deviceId)));
+  public synchronized void deleteSession(AxolotlAddress address) {
+    sessions.remove(address);
   }
 
 //  @Override
-  public synchronized void deleteAllSessions(long recipientId) {
+  public synchronized void deleteAllSessions(String name) {
     Enumeration enumeration = sessions.keys();
 
     while (enumeration.hasMoreElements()) {
-      Pair key = (Pair)enumeration.nextElement();
+      AxolotlAddress key = (AxolotlAddress)enumeration.nextElement();
 
-      if (((Long)key.first()).longValue() == recipientId) {
+      if (key.getName().equals(name)) {
         sessions.remove(key);
       }
     }

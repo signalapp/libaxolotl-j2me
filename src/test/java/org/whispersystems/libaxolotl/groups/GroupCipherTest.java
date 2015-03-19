@@ -1,6 +1,7 @@
 package org.whispersystems.libaxolotl.groups;
 
 import junit.framework.TestCase;
+import org.whispersystems.libaxolotl.AxolotlAddress;
 import org.whispersystems.libaxolotl.DuplicateMessageException;
 import org.whispersystems.libaxolotl.InvalidMessageException;
 import org.whispersystems.libaxolotl.LegacyMessageException;
@@ -12,6 +13,9 @@ import org.whispersystems.libaxolotl.protocol.SenderKeyDistributionMessage;
 import java.util.Vector;
 
 public class GroupCipherTest extends TestCase {
+
+  private static final AxolotlAddress SENDER_ADDRESS = new AxolotlAddress("+14150001111", 1);
+  private static final SenderKeyName  GROUP_SENDER   = new SenderKeyName("nihilist history reading group", SENDER_ADDRESS);
 
   public GroupCipherTest(String name) {
     super(name);
@@ -26,13 +30,13 @@ public class GroupCipherTest extends TestCase {
     GroupSessionBuilder aliceSessionBuilder = new GroupSessionBuilder(aliceStore);
     GroupSessionBuilder bobSessionBuilder   = new GroupSessionBuilder(bobStore);
 
-    GroupCipher aliceGroupCipher = new GroupCipher(new FakeSecureRandomProvider(), aliceStore, new SenderKeyName("cool group", 1111, 0));
-    GroupCipher bobGroupCipher   = new GroupCipher(new FakeSecureRandomProvider(), bobStore, new SenderKeyName("cool group", 1111, 0));
+    GroupCipher aliceGroupCipher = new GroupCipher(new FakeSecureRandomProvider(), aliceStore, GROUP_SENDER);
+    GroupCipher bobGroupCipher   = new GroupCipher(new FakeSecureRandomProvider(), bobStore, GROUP_SENDER);
 
     SenderKeyDistributionMessage aliceDistributionMessage =
-        aliceSessionBuilder.create(new SenderKeyName("cool group", 1111, 0), new FakeSecureRandomProvider());
+        aliceSessionBuilder.create(GROUP_SENDER, new FakeSecureRandomProvider());
 
-    bobSessionBuilder.process(new SenderKeyName("cool group", 1111, 0), aliceDistributionMessage);
+    bobSessionBuilder.process(GROUP_SENDER, aliceDistributionMessage);
 
     byte[] ciphertextFromAlice = aliceGroupCipher.encrypt("smert ze smert".getBytes());
     byte[] plaintextFromAlice  = bobGroupCipher.decrypt(ciphertextFromAlice);
@@ -49,7 +53,7 @@ public class GroupCipherTest extends TestCase {
     GroupSessionBuilder aliceSessionBuilder = new GroupSessionBuilder(aliceStore);
     GroupSessionBuilder bobSessionBuilder   = new GroupSessionBuilder(bobStore);
 
-    SenderKeyName aliceName = new SenderKeyName("cool group", 1111, 0);
+    SenderKeyName aliceName = GROUP_SENDER;
 
     GroupCipher aliceGroupCipher = new GroupCipher(new FakeSecureRandomProvider(), aliceStore, aliceName);
     GroupCipher bobGroupCipher   = new GroupCipher(new FakeSecureRandomProvider(), bobStore, aliceName);
@@ -89,7 +93,7 @@ public class GroupCipherTest extends TestCase {
     GroupSessionBuilder aliceSessionBuilder = new GroupSessionBuilder(aliceStore);
     GroupSessionBuilder bobSessionBuilder   = new GroupSessionBuilder(bobStore);
 
-    SenderKeyName aliceName = new SenderKeyName("cool group", 1111, 0);
+    SenderKeyName aliceName = GROUP_SENDER;
 
     GroupCipher aliceGroupCipher = new GroupCipher(new FakeSecureRandomProvider(), aliceStore, aliceName);
     GroupCipher bobGroupCipher   = new GroupCipher(new FakeSecureRandomProvider(), bobStore, aliceName);
@@ -117,7 +121,8 @@ public class GroupCipherTest extends TestCase {
 
   public void testEncryptNoSession() {
     InMemorySenderKeyStore aliceStore = new InMemorySenderKeyStore();
-    GroupCipher aliceGroupCipher = new GroupCipher(new FakeSecureRandomProvider(), aliceStore, new SenderKeyName("coolio groupio", 1111, 0));
+    GroupCipher aliceGroupCipher = new GroupCipher(new FakeSecureRandomProvider(), aliceStore, new SenderKeyName("coolio groupio", new AxolotlAddress("+10002223333", 1)));
+
     try {
       aliceGroupCipher.encrypt("up the punks".getBytes());
       throw new AssertionError("Should have failed!");
