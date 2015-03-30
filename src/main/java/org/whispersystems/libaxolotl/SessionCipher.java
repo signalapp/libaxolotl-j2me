@@ -16,18 +16,14 @@
  */
 package org.whispersystems.libaxolotl;
 
-import org.bouncycastle.crypto.BufferedBlockCipher;
-import org.bouncycastle.crypto.InvalidCipherTextException;
-import org.bouncycastle.crypto.engines.AESEngine;
-import org.bouncycastle.crypto.modes.CBCBlockCipher;
-import org.bouncycastle.crypto.modes.SICBlockCipher;
-import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
-import org.bouncycastle.crypto.params.KeyParameter;
-import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
+import org.whispersystems.libaxolotl.j2me.AssertionError;
+import org.whispersystems.libaxolotl.j2me.BlockCipher;
+import org.whispersystems.libaxolotl.j2me.BouncyCipherFactory;
+import org.whispersystems.libaxolotl.j2me.CipherFactory;
 import org.whispersystems.libaxolotl.protocol.CiphertextMessage;
 import org.whispersystems.libaxolotl.protocol.PreKeyWhisperMessage;
 import org.whispersystems.libaxolotl.protocol.WhisperMessage;
@@ -41,8 +37,6 @@ import org.whispersystems.libaxolotl.state.SessionRecord;
 import org.whispersystems.libaxolotl.state.SessionState;
 import org.whispersystems.libaxolotl.state.SessionStore;
 import org.whispersystems.libaxolotl.state.SignedPreKeyStore;
-import org.whispersystems.libaxolotl.j2me.AssertionError;
-import org.whispersystems.libaxolotl.util.ByteUtil;
 import org.whispersystems.libaxolotl.util.Pair;
 import org.whispersystems.libaxolotl.util.guava.Optional;
 
@@ -61,6 +55,7 @@ public class SessionCipher {
 
   public static final Object SESSION_LOCK = new Object();
 
+  private final CipherFactory        cipherFactory;
   private final SecureRandomProvider secureRandomProvider;
   private final SessionStore         sessionStore;
   private final SessionBuilder       sessionBuilder;
@@ -76,6 +71,7 @@ public class SessionCipher {
    * @param  remoteAddress The remote address that messages will be encrypted to or decrypted from.
    */
   public SessionCipher(SecureRandomProvider secureRandomProvider,
+                       CipherFactory cipherFactory,
                        SessionStore sessionStore, PreKeyStore preKeyStore,
                        SignedPreKeyStore signedPreKeyStore, IdentityKeyStore identityKeyStore,
                        AxolotlAddress remoteAddress)
@@ -84,13 +80,18 @@ public class SessionCipher {
     this.sessionStore         = sessionStore;
     this.preKeyStore          = preKeyStore;
     this.remoteAddress        = remoteAddress;
+    this.cipherFactory        = cipherFactory;
     this.sessionBuilder       = new SessionBuilder(secureRandomProvider,
                                                    sessionStore, preKeyStore, signedPreKeyStore,
                                                    identityKeyStore, remoteAddress);
   }
 
   public SessionCipher(SecureRandomProvider secureRandomProvider, AxolotlStore store, AxolotlAddress remoteAddress) {
-    this(secureRandomProvider, store, store, store, store, remoteAddress);
+    this(secureRandomProvider, new BouncyCipherFactory(), store, store, store, store, remoteAddress);
+  }
+
+  public SessionCipher(SecureRandomProvider secureRandomProvider, CipherFactory cipherFactory, AxolotlStore store, AxolotlAddress remoteAddress) {
+    this(secureRandomProvider, cipherFactory, store, store, store, store, remoteAddress);
   }
 
   /**
@@ -392,16 +393,16 @@ public class SessionCipher {
 
   private byte[] getCiphertext(int version, MessageKeys messageKeys, byte[] plaintext) {
     try {
-      BufferedBlockCipher cipher;
+      BlockCipher cipher;
 
       if (version >= 3) {
-        cipher = getCipher(true, new ParametersWithIV(messageKeys.getCipherKey(), messageKeys.getIv().getIV()));
+        cipher = cipherFactory.createCbc(true, messageKeys.getCipherKey().getKey(), messageKeys.getIv().getIV());
       } else {
-        cipher = getCipher(true, messageKeys.getCipherKey(), messageKeys.getCounter());
+        cipher = cipherFactory.createCtr(true, messageKeys.getCipherKey().getKey(), messageKeys.getCounter());
       }
 
       byte[] output    = new byte[cipher.getOutputSize(plaintext.length)];
-      int    processed = cipher.processBytes(plaintext, 0, plaintext.length, output, 0);
+      int    processed = cipher.process(plaintext, 0, plaintext.length, output, 0);
       int    finished  = cipher.doFinal(output, processed);
 
       if (processed + finished < output.length) {
@@ -411,7 +412,7 @@ public class SessionCipher {
       } else {
         return output;
       }
-    } catch (InvalidCipherTextException e) {
+    } catch (BlockCipher.InvalidCipherTextException e) {
       throw new AssertionError(e);
     }
   }
@@ -420,16 +421,16 @@ public class SessionCipher {
       throws InvalidMessageException
   {
     try {
-      BufferedBlockCipher cipher;
+      BlockCipher cipher;
 
       if (version >= 3) {
-        cipher = getCipher(false, new ParametersWithIV(messageKeys.getCipherKey(), messageKeys.getIv().getIV()));
+        cipher = cipherFactory.createCbc(false, messageKeys.getCipherKey().getKey(), messageKeys.getIv().getIV());
       } else {
-        cipher = getCipher(false, messageKeys.getCipherKey(), messageKeys.getCounter());
+        cipher = cipherFactory.createCtr(false, messageKeys.getCipherKey().getKey(), messageKeys.getCounter());
       }
 
       byte[] output    = new byte[cipher.getOutputSize(cipherText.length)];
-      int    processed = cipher.processBytes(cipherText, 0, cipherText.length, output, 0);
+      int    processed = cipher.process(cipherText, 0, cipherText.length, output, 0);
       int    finished  = cipher.doFinal(output, processed);
 
       if (processed + finished < output.length) {
@@ -440,35 +441,9 @@ public class SessionCipher {
         return output;
       }
 
-    } catch (InvalidCipherTextException icte) {
+    } catch (BlockCipher.InvalidCipherTextException icte) {
       throw new InvalidMessageException(icte);
     }
-  }
-
-  private BufferedBlockCipher getCipher(boolean encrypt, KeyParameter key, int counter)  {
-    byte[] ivBytes = new byte[16];
-    ByteUtil.intToByteArray(ivBytes, 0, counter);
-
-    BufferedBlockCipher cipher = new BufferedBlockCipher(new SICBlockCipher(new AESEngine()));
-    cipher.init(encrypt, new ParametersWithIV(key, ivBytes));
-
-    return cipher;
-  }
-
-  private PaddedBufferedBlockCipher getCipher(boolean encrypt, ParametersWithIV iv) {
-    PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
-    cipher.init(encrypt, iv);
-
-    return cipher;
-//    try {
-//      Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-//      cipher.init(mode, key, iv);
-//      return cipher;
-//    } catch (NoSuchAlgorithmException | NoSuchPaddingException | java.security.InvalidKeyException |
-//             InvalidAlgorithmParameterException e)
-//    {
-//      throw new AssertionError(e);
-//    }
   }
 
   public static interface DecryptionCallback {
