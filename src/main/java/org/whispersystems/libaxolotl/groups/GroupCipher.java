@@ -36,6 +36,9 @@ import org.whispersystems.libaxolotl.groups.state.SenderKeyRecord;
 import org.whispersystems.libaxolotl.groups.state.SenderKeyState;
 import org.whispersystems.libaxolotl.groups.state.SenderKeyStore;
 import org.whispersystems.libaxolotl.j2me.AssertionError;
+import org.whispersystems.libaxolotl.j2me.BlockCipher;
+import org.whispersystems.libaxolotl.j2me.BouncyCipherFactory;
+import org.whispersystems.libaxolotl.j2me.CipherFactory;
 import org.whispersystems.libaxolotl.protocol.SenderKeyMessage;
 
 import java.io.IOException;
@@ -55,11 +58,19 @@ public class GroupCipher {
   static final Object LOCK = new Object();
 
   private final SecureRandomProvider secureRandomProvider;
+  private final CipherFactory        cipherFactory;
   private final SenderKeyStore       senderKeyStore;
   private final SenderKeyName        senderKeyId;
 
   public GroupCipher(SecureRandomProvider secureRandomProvider, SenderKeyStore senderKeyStore, SenderKeyName senderKeyId) {
+    this(secureRandomProvider, new BouncyCipherFactory(), senderKeyStore, senderKeyId);
+  }
+
+  public GroupCipher(SecureRandomProvider secureRandomProvider, CipherFactory cipherFactory,
+                     SenderKeyStore senderKeyStore, SenderKeyName senderKeyId)
+  {
     this.secureRandomProvider = secureRandomProvider;
+    this.cipherFactory        = cipherFactory;
     this.senderKeyStore       = senderKeyStore;
     this.senderKeyId          = senderKeyId;
   }
@@ -152,9 +163,9 @@ public class GroupCipher {
   {
     try {
       return cipher(false, iv, key, ciphertext);
-    } catch (InvalidCipherTextException e) {
-      throw new InvalidMessageException(e);
     } catch (IOException e) {
+      throw new InvalidMessageException(e);
+    } catch (BlockCipher.InvalidCipherTextException e) {
       throw new InvalidMessageException(e);
     }
   }
@@ -162,23 +173,20 @@ public class GroupCipher {
   private byte[] getCipherText(byte[] iv, byte[] key, byte[] plaintext) {
     try {
       return cipher(true, iv, key, plaintext);
-    } catch (InvalidCipherTextException e) {
-      throw new AssertionError(e);
     } catch (IOException e) {
+      throw new AssertionError(e);
+    } catch (BlockCipher.InvalidCipherTextException e) {
       throw new AssertionError(e);
     }
   }
 
   private byte[] cipher(boolean encrypt, byte[] iv, byte[] key, byte[] input)
-      throws InvalidCipherTextException, IOException
+      throws IOException, BlockCipher.InvalidCipherTextException
   {
-    KeyParameter              keyParameter = new KeyParameter(key, 0, key.length);
-    PaddedBufferedBlockCipher cipher       = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
-    cipher.init(encrypt, new ParametersWithIV(keyParameter, iv, 0, iv.length));
-
-    byte[] buffer    = new byte[cipher.getOutputSize(input.length)];
-    int    processed = cipher.processBytes(input, 0, input.length, buffer, 0);
-    int    finished  = cipher.doFinal(buffer, processed);
+    BlockCipher cipher    = cipherFactory.createCbc(encrypt, key, iv);
+    byte[]      buffer    = new byte[cipher.getOutputSize(input.length)];
+    int         processed = cipher.process(input, 0, input.length, buffer, 0);
+    int         finished  = cipher.doFinal(buffer, processed);
 
     if (processed + finished < buffer.length) {
       byte[] trimmed = new byte[processed + finished];
