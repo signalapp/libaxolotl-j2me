@@ -3,10 +3,11 @@ package org.whispersystems.libaxolotl.kdf;
 
 
 import junit.framework.TestCase;
+import org.whispersystems.libaxolotl.AxolotlBaseTestCase;
 import org.whispersystems.libaxolotl.j2me.Arrays;
 
 
-public class HKDFTest extends TestCase {
+public class HKDFTest extends AxolotlBaseTestCase {
 
   public HKDFTest(String name) {
     super(name);

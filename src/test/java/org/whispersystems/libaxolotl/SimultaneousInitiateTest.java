@@ -5,6 +5,8 @@ import junit.framework.TestCase;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.j2me.FakeSecureRandomProvider;
+import org.whispersystems.libaxolotl.j2me.jce.BCJmeSecurityProvider;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
 import org.whispersystems.libaxolotl.protocol.CiphertextMessage;
 import org.whispersystems.libaxolotl.protocol.PreKeyWhisperMessage;
 import org.whispersystems.libaxolotl.protocol.WhisperMessage;
@@ -18,7 +20,7 @@ import org.whispersystems.libaxolotl.util.Medium;
 import java.util.Random;
 
 
-public class SimultaneousInitiateTest extends TestCase {
+public class SimultaneousInitiateTest extends AxolotlBaseTestCase {
 
   private static final AxolotlAddress BOB_ADDRESS   = new AxolotlAddress("+14151231234", 1);
   private static final AxolotlAddress ALICE_ADDRESS = new AxolotlAddress("+14159998888", 1);
@@ -32,7 +34,7 @@ public class SimultaneousInitiateTest extends TestCase {
   public SimultaneousInitiateTest(String name) {
     super(name);
   }
-
+  
   public void testBasicSimultaneousInitiate()
       throws InvalidKeyException, UntrustedIdentityException, InvalidVersionException,
       InvalidMessageException, DuplicateMessageException, LegacyMessageException,
@@ -44,11 +46,11 @@ public class SimultaneousInitiateTest extends TestCase {
     PreKeyBundle alicePreKeyBundle = createAlicePreKeyBundle(aliceStore);
     PreKeyBundle bobPreKeyBundle = createBobPreKeyBundle(bobStore);
 
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionBuilder bobSessionBuilder   = new SessionBuilder(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
+    SessionBuilder bobSessionBuilder   = new SessionBuilder(bobStore, ALICE_ADDRESS);
 
-    SessionCipher aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
 
     aliceSessionBuilder.process(bobPreKeyBundle);
     bobSessionBuilder.process(alicePreKeyBundle);
@@ -98,11 +100,11 @@ public class SimultaneousInitiateTest extends TestCase {
     PreKeyBundle alicePreKeyBundle = createAlicePreKeyBundle(aliceStore);
     PreKeyBundle bobPreKeyBundle = createBobPreKeyBundle(bobStore);
 
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionBuilder bobSessionBuilder   = new SessionBuilder(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
+    SessionBuilder bobSessionBuilder   = new SessionBuilder(bobStore, ALICE_ADDRESS);
 
-    SessionCipher aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
 
     aliceSessionBuilder.process(bobPreKeyBundle);
     bobSessionBuilder.process(alicePreKeyBundle);
@@ -150,11 +152,11 @@ public class SimultaneousInitiateTest extends TestCase {
     PreKeyBundle alicePreKeyBundle = createAlicePreKeyBundle(aliceStore);
     PreKeyBundle bobPreKeyBundle = createBobPreKeyBundle(bobStore);
 
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionBuilder bobSessionBuilder   = new SessionBuilder(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
+    SessionBuilder bobSessionBuilder   = new SessionBuilder(bobStore, ALICE_ADDRESS);
 
-    SessionCipher aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
 
     aliceSessionBuilder.process(bobPreKeyBundle);
     bobSessionBuilder.process(alicePreKeyBundle);
@@ -209,11 +211,11 @@ public class SimultaneousInitiateTest extends TestCase {
     PreKeyBundle alicePreKeyBundle = createAlicePreKeyBundle(aliceStore);
     PreKeyBundle bobPreKeyBundle = createBobPreKeyBundle(bobStore);
 
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionBuilder bobSessionBuilder   = new SessionBuilder(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
+    SessionBuilder bobSessionBuilder   = new SessionBuilder(bobStore, ALICE_ADDRESS);
 
-    SessionCipher aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
 
     aliceSessionBuilder.process(bobPreKeyBundle);
     bobSessionBuilder.process(alicePreKeyBundle);
@@ -283,11 +285,11 @@ public class SimultaneousInitiateTest extends TestCase {
     AxolotlStore bobStore   = new InMemoryAxolotlStore();
 
 
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionBuilder bobSessionBuilder   = new SessionBuilder(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
+    SessionBuilder bobSessionBuilder   = new SessionBuilder(bobStore, ALICE_ADDRESS);
 
-    SessionCipher aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
 
     for (int i=0;i<15;i++) {
       PreKeyBundle alicePreKeyBundle = createAlicePreKeyBundle(aliceStore);
@@ -362,11 +364,11 @@ public class SimultaneousInitiateTest extends TestCase {
     AxolotlStore bobStore   = new InMemoryAxolotlStore();
 
 
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionBuilder bobSessionBuilder   = new SessionBuilder(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
+    SessionBuilder bobSessionBuilder   = new SessionBuilder(bobStore, ALICE_ADDRESS);
 
-    SessionCipher aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
 
 //    PreKeyBundle aliceLostPreKeyBundle = createAlicePreKeyBundle(aliceStore);
     PreKeyBundle bobLostPreKeyBundle   = createBobPreKeyBundle(bobStore);

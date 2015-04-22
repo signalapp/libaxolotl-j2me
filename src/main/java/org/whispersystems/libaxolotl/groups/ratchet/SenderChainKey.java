@@ -16,9 +16,8 @@
  */
 package org.whispersystems.libaxolotl.groups.ratchet;
 
-import org.bouncycastle.crypto.digests.SHA256Digest;
-import org.bouncycastle.crypto.macs.HMac;
-import org.bouncycastle.crypto.params.KeyParameter;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
+import org.whispersystems.libaxolotl.j2me.jce.mac.Mac;
 
 /**
  * Each SenderKey is a "chain" of keys, each derived from the previous.
@@ -60,9 +59,8 @@ public class SenderChainKey {
   }
 
   private byte[] getDerivative(byte[] seed, byte[] key) {
-    HMac   mac    = new HMac(new SHA256Digest());
+    Mac    mac    = JmeSecurity.getProvider().createMacSha256(key);
     byte[] output = new byte[32];
-    mac.init(new KeyParameter(key, 0, key.length));
 
     mac.update(seed, 0, seed.length);
     mac.doFinal(output, 0);

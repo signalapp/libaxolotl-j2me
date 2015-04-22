@@ -17,9 +17,8 @@
 package org.whispersystems.libaxolotl.ratchet;
 
 
-import org.bouncycastle.crypto.digests.SHA256Digest;
-import org.bouncycastle.crypto.macs.HMac;
-import org.bouncycastle.crypto.params.KeyParameter;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
+import org.whispersystems.libaxolotl.j2me.jce.mac.Mac;
 import org.whispersystems.libaxolotl.kdf.DerivedMessageSecrets;
 import org.whispersystems.libaxolotl.kdf.HKDF;
 
@@ -60,10 +59,9 @@ public class ChainKey {
   }
 
   private byte[] getBaseMaterial(byte[] seed) {
-    HMac   mac    = new HMac(new SHA256Digest());
-    byte[] output = new byte[mac.getMacSize()];
+    Mac    mac    = JmeSecurity.getProvider().createMacSha256(key);
+    byte[] output = new byte[32];
 
-    mac.init(new KeyParameter(key, 0, key.length));
     mac.update(seed, 0, seed.length);
     mac.doFinal(output, 0);
 

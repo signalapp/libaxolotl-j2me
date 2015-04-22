@@ -6,6 +6,8 @@ import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.j2me.Collections;
 import org.whispersystems.libaxolotl.j2me.FakeSecureRandomProvider;
+import org.whispersystems.libaxolotl.j2me.jce.BCJmeSecurityProvider;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
 import org.whispersystems.libaxolotl.protocol.CiphertextMessage;
 import org.whispersystems.libaxolotl.protocol.WhisperMessage;
 import org.whispersystems.libaxolotl.ratchet.AliceAxolotlParameters;
@@ -22,7 +24,7 @@ import java.util.Vector;
 
 
 
-public class SessionCipherTest extends TestCase {
+public class SessionCipherTest extends AxolotlBaseTestCase {
 
   public SessionCipherTest(String name) {
     super(name);
@@ -58,8 +60,8 @@ public class SessionCipherTest extends TestCase {
     aliceStore.storeSession(new AxolotlAddress("+14159999999", 1), aliceSessionRecord);
     bobStore.storeSession(new AxolotlAddress("+14158888888", 1), bobSessionRecord);
 
-    SessionCipher     aliceCipher    = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, new AxolotlAddress("+14159999999", 1));
-    SessionCipher     bobCipher      = new SessionCipher(new FakeSecureRandomProvider(), bobStore, new AxolotlAddress("+14158888888", 1));
+    SessionCipher     aliceCipher    = new SessionCipher(aliceStore, new AxolotlAddress("+14159999999", 1));
+    SessionCipher     bobCipher      = new SessionCipher(bobStore, new AxolotlAddress("+14158888888", 1));
 
     byte[]            alicePlaintext = "This is a plaintext message.".getBytes();
     CiphertextMessage message        = aliceCipher.encrypt(alicePlaintext);

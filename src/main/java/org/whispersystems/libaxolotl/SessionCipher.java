@@ -16,14 +16,12 @@
  */
 package org.whispersystems.libaxolotl;
 
-import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
 import org.whispersystems.libaxolotl.j2me.AssertionError;
-import org.whispersystems.libaxolotl.j2me.BlockCipher;
-import org.whispersystems.libaxolotl.j2me.BouncyCipherFactory;
-import org.whispersystems.libaxolotl.j2me.CipherFactory;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
+import org.whispersystems.libaxolotl.j2me.jce.ciphers.BlockCipher;
 import org.whispersystems.libaxolotl.protocol.CiphertextMessage;
 import org.whispersystems.libaxolotl.protocol.PreKeyWhisperMessage;
 import org.whispersystems.libaxolotl.protocol.WhisperMessage;
@@ -55,12 +53,10 @@ public class SessionCipher {
 
   public static final Object SESSION_LOCK = new Object();
 
-  private final CipherFactory        cipherFactory;
-  private final SecureRandomProvider secureRandomProvider;
-  private final SessionStore         sessionStore;
-  private final SessionBuilder       sessionBuilder;
-  private final PreKeyStore          preKeyStore;
-  private final AxolotlAddress       remoteAddress;
+  private final SessionStore   sessionStore;
+  private final SessionBuilder sessionBuilder;
+  private final PreKeyStore    preKeyStore;
+  private final AxolotlAddress remoteAddress;
 
   /**
    * Construct a SessionCipher for encrypt/decrypt operations on a session.
@@ -70,28 +66,19 @@ public class SessionCipher {
    * @param  sessionStore The {@link SessionStore} that contains a session for this recipient.
    * @param  remoteAddress The remote address that messages will be encrypted to or decrypted from.
    */
-  public SessionCipher(SecureRandomProvider secureRandomProvider,
-                       CipherFactory cipherFactory,
-                       SessionStore sessionStore, PreKeyStore preKeyStore,
+  public SessionCipher(SessionStore sessionStore, PreKeyStore preKeyStore,
                        SignedPreKeyStore signedPreKeyStore, IdentityKeyStore identityKeyStore,
                        AxolotlAddress remoteAddress)
   {
-    this.secureRandomProvider = secureRandomProvider;
-    this.sessionStore         = sessionStore;
-    this.preKeyStore          = preKeyStore;
-    this.remoteAddress        = remoteAddress;
-    this.cipherFactory        = cipherFactory;
-    this.sessionBuilder       = new SessionBuilder(secureRandomProvider,
-                                                   sessionStore, preKeyStore, signedPreKeyStore,
-                                                   identityKeyStore, remoteAddress);
+    this.sessionStore   = sessionStore;
+    this.preKeyStore    = preKeyStore;
+    this.remoteAddress  = remoteAddress;
+    this.sessionBuilder = new SessionBuilder(sessionStore, preKeyStore, signedPreKeyStore,
+                                             identityKeyStore, remoteAddress);
   }
 
-  public SessionCipher(SecureRandomProvider secureRandomProvider, AxolotlStore store, AxolotlAddress remoteAddress) {
-    this(secureRandomProvider, new BouncyCipherFactory(), store, store, store, store, remoteAddress);
-  }
-
-  public SessionCipher(SecureRandomProvider secureRandomProvider, CipherFactory cipherFactory, AxolotlStore store, AxolotlAddress remoteAddress) {
-    this(secureRandomProvider, cipherFactory, store, store, store, store, remoteAddress);
+  public SessionCipher(AxolotlStore store, AxolotlAddress remoteAddress) {
+    this(store, store, store, store, remoteAddress);
   }
 
   /**
@@ -348,7 +335,7 @@ public class SessionCipher {
         RootKey   rootKey         = sessionState.getRootKey();
         ECKeyPair ourEphemeral    = sessionState.getSenderRatchetKeyPair();
         Pair      receiverChain   = rootKey.createChain(theirEphemeral, ourEphemeral);
-        ECKeyPair ourNewEphemeral = Curve.generateKeyPair(secureRandomProvider);
+        ECKeyPair ourNewEphemeral = Curve.generateKeyPair(JmeSecurity.getProvider().createSecureRandom());
         Pair      senderChain     = ((RootKey)receiverChain.first()).createChain(theirEphemeral, ourNewEphemeral);
 
         sessionState.setRootKey((RootKey)senderChain.first());
@@ -396,9 +383,9 @@ public class SessionCipher {
       BlockCipher cipher;
 
       if (version >= 3) {
-        cipher = cipherFactory.createCbc(true, messageKeys.getCipherKey().getKey(), messageKeys.getIv().getIV());
+        cipher = JmeSecurity.getProvider().createCbcCipher(true, messageKeys.getCipherKey().getKey(), messageKeys.getIv().getIV());
       } else {
-        cipher = cipherFactory.createCtr(true, messageKeys.getCipherKey().getKey(), messageKeys.getCounter());
+        cipher = JmeSecurity.getProvider().createCtrCipher(true, messageKeys.getCipherKey().getKey(), messageKeys.getCounter());
       }
 
       byte[] output    = new byte[cipher.getOutputSize(plaintext.length)];
@@ -424,9 +411,9 @@ public class SessionCipher {
       BlockCipher cipher;
 
       if (version >= 3) {
-        cipher = cipherFactory.createCbc(false, messageKeys.getCipherKey().getKey(), messageKeys.getIv().getIV());
+        cipher = JmeSecurity.getProvider().createCbcCipher(false, messageKeys.getCipherKey().getKey(), messageKeys.getIv().getIV());
       } else {
-        cipher = cipherFactory.createCtr(false, messageKeys.getCipherKey().getKey(), messageKeys.getCounter());
+        cipher = JmeSecurity.getProvider().createCtrCipher(false, messageKeys.getCipherKey().getKey(), messageKeys.getCounter());
       }
 
       byte[] output    = new byte[cipher.getOutputSize(cipherText.length)];

@@ -17,10 +17,9 @@
 
 package org.whispersystems.libaxolotl.kdf;
 
-import org.bouncycastle.crypto.digests.SHA256Digest;
-import org.bouncycastle.crypto.macs.HMac;
-import org.bouncycastle.crypto.params.KeyParameter;
 import org.whispersystems.libaxolotl.j2me.AssertionError;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
+import org.whispersystems.libaxolotl.j2me.jce.mac.Mac;
 
 import java.io.ByteArrayOutputStream;
 
@@ -47,9 +46,8 @@ public abstract class HKDF {
   }
 
   private byte[] extract(byte[] salt, byte[] inputKeyMaterial) {
-    HMac   mac    = new HMac(new SHA256Digest());
-    byte[] output = new byte[mac.getMacSize()];
-    mac.init(new KeyParameter(salt, 0, salt.length));
+    Mac    mac    = JmeSecurity.getProvider().createMacSha256(salt);
+    byte[] output = new byte[32];
 
     mac.update(inputKeyMaterial, 0, inputKeyMaterial.length);
     mac.doFinal(output, 0);
@@ -64,9 +62,8 @@ public abstract class HKDF {
     int                   remainingBytes = outputSize;
 
     for (int i= getIterationStartOffset();i<iterations + getIterationStartOffset();i++) {
-      HMac   mac        = new HMac(new SHA256Digest());
-      byte[] stepResult = new byte[mac.getMacSize()];
-      mac.init(new KeyParameter(prk, 0, prk.length));
+      Mac    mac        = JmeSecurity.getProvider().createMacSha256(prk);
+      byte[] stepResult = new byte[32];
 
       mac.update(mixin, 0, mixin.length);
       if (info != null) {

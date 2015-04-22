@@ -2,6 +2,7 @@ package org.whispersystems.libaxolotl.ratchet;
 
 
 import junit.framework.TestCase;
+import org.whispersystems.libaxolotl.AxolotlBaseTestCase;
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
@@ -13,7 +14,7 @@ import org.whispersystems.libaxolotl.util.Pair;
 
 
 
-public class RootKeyTest extends TestCase {
+public class RootKeyTest extends AxolotlBaseTestCase {
 
   public RootKeyTest(String name) {
     super(name);

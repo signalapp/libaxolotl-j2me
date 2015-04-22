@@ -2,6 +2,7 @@ package org.whispersystems.libaxolotl.ecc;
 
 
 import junit.framework.TestCase;
+import org.whispersystems.libaxolotl.AxolotlBaseTestCase;
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.j2me.FakeSecureRandomProvider;
 import org.whispersystems.libaxolotl.j2me.Arrays;
@@ -10,7 +11,7 @@ import org.whispersystems.libaxolotl.j2me.AssertionError;
 
 
 
-public class Curve25519Test extends TestCase {
+public class Curve25519Test extends AxolotlBaseTestCase {
 
   public Curve25519Test(String name) {
     super(name);

@@ -16,8 +16,6 @@
  */
 package org.whispersystems.libaxolotl.protocol;
 
-import org.bouncycastle.crypto.digests.SHA256Digest;
-import org.bouncycastle.crypto.macs.HMac;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.whispersystems.libaxolotl.IdentityKey;
 import org.whispersystems.libaxolotl.InvalidKeyException;
@@ -25,9 +23,11 @@ import org.whispersystems.libaxolotl.InvalidMessageException;
 import org.whispersystems.libaxolotl.LegacyMessageException;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
-import org.whispersystems.libaxolotl.util.ByteUtil;
 import org.whispersystems.libaxolotl.j2me.MessageDigest;
 import org.whispersystems.libaxolotl.j2me.ParseException;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
+import org.whispersystems.libaxolotl.j2me.jce.mac.Mac;
+import org.whispersystems.libaxolotl.util.ByteUtil;
 
 public class WhisperMessage implements CiphertextMessage {
 
@@ -138,9 +138,8 @@ public class WhisperMessage implements CiphertextMessage {
                         IdentityKey receiverIdentityKey,
                         KeyParameter macKey, byte[] serialized)
   {
-    HMac   mac    = new HMac(new SHA256Digest());
-    byte[] output = new byte[mac.getMacSize()];
-    mac.init(macKey);
+    Mac    mac    = JmeSecurity.getProvider().createMacSha256(macKey.getKey());
+    byte[] output = new byte[32];
 
     if (messageVersion >= 3) {
       byte[] senderIdentity = senderIdentityKey.getPublicKey().serialize();

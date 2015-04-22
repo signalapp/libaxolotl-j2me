@@ -1,11 +1,12 @@
 package org.whispersystems.libaxolotl.ratchet;
 
 import junit.framework.TestCase;
+import org.whispersystems.libaxolotl.AxolotlBaseTestCase;
 import org.whispersystems.libaxolotl.kdf.HKDF;
 import org.whispersystems.libaxolotl.j2me.Arrays;
 
 
-public class ChainKeyTest extends TestCase {
+public class ChainKeyTest extends AxolotlBaseTestCase {
 
   public ChainKeyTest(String testName) {
     super(testName);

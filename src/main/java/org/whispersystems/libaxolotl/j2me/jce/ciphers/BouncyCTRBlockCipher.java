@@ -1,25 +1,26 @@
-package org.whispersystems.libaxolotl.j2me;
+package org.whispersystems.libaxolotl.j2me.jce.ciphers;
 
 import org.bouncycastle.crypto.BufferedBlockCipher;
-import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.engines.AESEngine;
-import org.bouncycastle.crypto.modes.CBCBlockCipher;
-import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
+import org.bouncycastle.crypto.modes.SICBlockCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
+import org.whispersystems.libaxolotl.util.ByteUtil;
 
-public class BouncyCBCBlockCipher implements BlockCipher {
+public class BouncyCTRBlockCipher implements BlockCipher {
 
   private final BufferedBlockCipher cipher;
 
-  public BouncyCBCBlockCipher(boolean encrypt, byte[] key, byte[] iv) {
-    this.cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()));
-    cipher.init(encrypt, new ParametersWithIV(new KeyParameter(key), iv));
+  public BouncyCTRBlockCipher(boolean encrypt, byte[] key, int counter) {
+    byte[] ivBytes = new byte[16];
+    ByteUtil.intToByteArray(ivBytes, 0, counter);
+
+    this.cipher = new BufferedBlockCipher(new SICBlockCipher(new AESEngine()));
+    cipher.init(encrypt, new ParametersWithIV(new KeyParameter(key), ivBytes));
   }
 
-  public int process(byte[] input, int inputOffset, int inputLength,
-                     byte[] output, int outputOffset)
-  {
+
+  public int process(byte[] input, int inputOffset, int inputLength, byte[] output, int outputOffset) {
     return cipher.processBytes(input, inputOffset, inputLength, output, outputOffset);
   }
 

@@ -17,13 +17,6 @@
 
 package org.whispersystems.libaxolotl.groups;
 
-import org.bouncycastle.crypto.InvalidCipherTextException;
-import org.bouncycastle.crypto.engines.AESEngine;
-import org.bouncycastle.crypto.modes.CBCBlockCipher;
-import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
-import org.bouncycastle.crypto.params.KeyParameter;
-import org.bouncycastle.crypto.params.ParametersWithIV;
-import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.DuplicateMessageException;
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.InvalidKeyIdException;
@@ -36,9 +29,8 @@ import org.whispersystems.libaxolotl.groups.state.SenderKeyRecord;
 import org.whispersystems.libaxolotl.groups.state.SenderKeyState;
 import org.whispersystems.libaxolotl.groups.state.SenderKeyStore;
 import org.whispersystems.libaxolotl.j2me.AssertionError;
-import org.whispersystems.libaxolotl.j2me.BlockCipher;
-import org.whispersystems.libaxolotl.j2me.BouncyCipherFactory;
-import org.whispersystems.libaxolotl.j2me.CipherFactory;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
+import org.whispersystems.libaxolotl.j2me.jce.ciphers.BlockCipher;
 import org.whispersystems.libaxolotl.protocol.SenderKeyMessage;
 
 import java.io.IOException;
@@ -57,22 +49,13 @@ public class GroupCipher {
 
   static final Object LOCK = new Object();
 
-  private final SecureRandomProvider secureRandomProvider;
-  private final CipherFactory        cipherFactory;
-  private final SenderKeyStore       senderKeyStore;
-  private final SenderKeyName        senderKeyId;
+  private final SenderKeyStore senderKeyStore;
+  private final SenderKeyName  senderKeyId;
 
-  public GroupCipher(SecureRandomProvider secureRandomProvider, SenderKeyStore senderKeyStore, SenderKeyName senderKeyId) {
-    this(secureRandomProvider, new BouncyCipherFactory(), senderKeyStore, senderKeyId);
-  }
-
-  public GroupCipher(SecureRandomProvider secureRandomProvider, CipherFactory cipherFactory,
-                     SenderKeyStore senderKeyStore, SenderKeyName senderKeyId)
+  public GroupCipher(SenderKeyStore senderKeyStore, SenderKeyName senderKeyId)
   {
-    this.secureRandomProvider = secureRandomProvider;
-    this.cipherFactory        = cipherFactory;
-    this.senderKeyStore       = senderKeyStore;
-    this.senderKeyId          = senderKeyId;
+    this.senderKeyStore = senderKeyStore;
+    this.senderKeyId    = senderKeyId;
   }
 
   /**
@@ -89,7 +72,7 @@ public class GroupCipher {
         SenderKeyState   senderKeyState = record.getSenderKeyState();
         SenderMessageKey senderKey      = senderKeyState.getSenderChainKey().getSenderMessageKey();
         byte[]           ciphertext     = getCipherText(senderKey.getIv(), senderKey.getCipherKey(), paddedPlaintext);
-        SenderKeyMessage senderKeyMessage = new SenderKeyMessage(secureRandomProvider,
+        SenderKeyMessage senderKeyMessage = new SenderKeyMessage(JmeSecurity.getProvider().createSecureRandom(),
                                                                  senderKeyState.getKeyId(),
                                                                  senderKey.getIteration(),
                                                                  ciphertext,
@@ -183,7 +166,7 @@ public class GroupCipher {
   private byte[] cipher(boolean encrypt, byte[] iv, byte[] key, byte[] input)
       throws IOException, BlockCipher.InvalidCipherTextException
   {
-    BlockCipher cipher    = cipherFactory.createCbc(encrypt, key, iv);
+    BlockCipher cipher    = JmeSecurity.getProvider().createCbcCipher(encrypt, key, iv);
     byte[]      buffer    = new byte[cipher.getOutputSize(input.length)];
     int         processed = cipher.process(input, 0, input.length, buffer, 0);
     int         finished  = cipher.doFinal(buffer, processed);

@@ -6,6 +6,8 @@ import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.j2me.Collections;
 import org.whispersystems.libaxolotl.j2me.FakeSecureRandomProvider;
+import org.whispersystems.libaxolotl.j2me.jce.BCJmeSecurityProvider;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
 import org.whispersystems.libaxolotl.protocol.CiphertextMessage;
 import org.whispersystems.libaxolotl.protocol.KeyExchangeMessage;
 import org.whispersystems.libaxolotl.protocol.PreKeyWhisperMessage;
@@ -22,7 +24,7 @@ import java.util.Random;
 import java.util.Vector;
 
 
-public class SessionBuilderTest extends TestCase {
+public class SessionBuilderTest extends AxolotlBaseTestCase {
 
   private static final AxolotlAddress ALICE_ADDRESS = new AxolotlAddress("+14151111111", 1);
   private static final AxolotlAddress BOB_ADDRESS   = new AxolotlAddress("+14152222222", 1);
@@ -34,7 +36,7 @@ public class SessionBuilderTest extends TestCase {
   public void testBasicPreKeyV2()
       throws InvalidKeyException, InvalidVersionException, InvalidMessageException, InvalidKeyIdException, DuplicateMessageException, LegacyMessageException, UntrustedIdentityException, NoSessionException {
     AxolotlStore   aliceStore          = new InMemoryAxolotlStore();
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
 
     AxolotlStore bobStore      = new InMemoryAxolotlStore();
     ECKeyPair    bobPreKeyPair = Curve.generateKeyPair(new FakeSecureRandomProvider());
@@ -49,7 +51,7 @@ public class SessionBuilderTest extends TestCase {
     assertTrue(aliceStore.loadSession(BOB_ADDRESS).getSessionState().getSessionVersion() == 2);
 
     String            originalMessage    = "L'homme est condamné à être libre";
-    SessionCipher     aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
     CiphertextMessage outgoingMessage    = aliceSessionCipher.encrypt(originalMessage.getBytes());
 
     assertTrue(outgoingMessage.getType() == CiphertextMessage.PREKEY_TYPE);
@@ -57,7 +59,7 @@ public class SessionBuilderTest extends TestCase {
     PreKeyWhisperMessage incomingMessage = new PreKeyWhisperMessage(outgoingMessage.serialize());
     bobStore.storePreKey(31337, new PreKeyRecord(bobPreKey.getPreKeyId(), bobPreKeyPair));
 
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
     byte[]        plaintext        = bobSessionCipher.decrypt(incomingMessage);
 
     assertTrue(bobStore.containsSession(ALICE_ADDRESS));
@@ -73,8 +75,8 @@ public class SessionBuilderTest extends TestCase {
     runInteraction(aliceStore, bobStore);
 
     aliceStore          = new InMemoryAxolotlStore();
-    aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    aliceSessionCipher  = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
+    aliceSessionCipher  = new SessionCipher(aliceStore, BOB_ADDRESS);
 
     bobPreKeyPair = Curve.generateKeyPair(new FakeSecureRandomProvider());
     bobPreKey = new PreKeyBundle(bobStore.getLocalRegistrationId(),
@@ -113,7 +115,7 @@ public class SessionBuilderTest extends TestCase {
   public void testBasicPreKeyV3()
       throws InvalidKeyException, InvalidVersionException, InvalidMessageException, InvalidKeyIdException, DuplicateMessageException, LegacyMessageException, UntrustedIdentityException, NoSessionException {
     AxolotlStore   aliceStore          = new InMemoryAxolotlStore();
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
 
     final AxolotlStore bobStore                 = new InMemoryAxolotlStore();
           ECKeyPair    bobPreKeyPair            = Curve.generateKeyPair(new FakeSecureRandomProvider());
@@ -134,7 +136,7 @@ public class SessionBuilderTest extends TestCase {
     assertTrue(aliceStore.loadSession(BOB_ADDRESS).getSessionState().getSessionVersion() == 3);
 
     final String            originalMessage    = "L'homme est condamné à être libre";
-          SessionCipher     aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+          SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
           CiphertextMessage outgoingMessage    = aliceSessionCipher.encrypt(originalMessage.getBytes());
 
     assertTrue(outgoingMessage.getType() == CiphertextMessage.PREKEY_TYPE);
@@ -143,7 +145,7 @@ public class SessionBuilderTest extends TestCase {
     bobStore.storePreKey(31337, new PreKeyRecord(bobPreKey.getPreKeyId(), bobPreKeyPair));
     bobStore.storeSignedPreKey(22, new SignedPreKeyRecord(22, System.currentTimeMillis(), bobSignedPreKeyPair, bobSignedPreKeySignature));
 
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
     byte[] plaintext = bobSessionCipher.decrypt(incomingMessage, new SessionCipher.DecryptionCallback() {
 //      @Override
       public void handlePlaintext(byte[] plaintext) {
@@ -166,8 +168,8 @@ public class SessionBuilderTest extends TestCase {
     runInteraction(aliceStore, bobStore);
 
     aliceStore          = new InMemoryAxolotlStore();
-    aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    aliceSessionCipher  = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
+    aliceSessionCipher  = new SessionCipher(aliceStore, BOB_ADDRESS);
 
     bobPreKeyPair            = Curve.generateKeyPair(new FakeSecureRandomProvider());
     bobSignedPreKeyPair      = Curve.generateKeyPair(new FakeSecureRandomProvider());
@@ -209,7 +211,7 @@ public class SessionBuilderTest extends TestCase {
 
   public void testBadSignedPreKeySignature() throws InvalidKeyException, UntrustedIdentityException {
     AxolotlStore   aliceStore          = new InMemoryAxolotlStore();
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
 
     IdentityKeyStore bobIdentityKeyStore = new InMemoryIdentityKeyStore();
 
@@ -249,7 +251,7 @@ public class SessionBuilderTest extends TestCase {
 
   public void testRepeatBundleMessageV2() throws InvalidKeyException, UntrustedIdentityException, InvalidVersionException, InvalidMessageException, InvalidKeyIdException, DuplicateMessageException, LegacyMessageException, NoSessionException {
     AxolotlStore   aliceStore          = new InMemoryAxolotlStore();
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
 
     AxolotlStore bobStore = new InMemoryAxolotlStore();
 
@@ -270,7 +272,7 @@ public class SessionBuilderTest extends TestCase {
     aliceSessionBuilder.process(bobPreKey);
 
     String            originalMessage    = "L'homme est condamné à être libre";
-    SessionCipher     aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
     CiphertextMessage outgoingMessageOne = aliceSessionCipher.encrypt(originalMessage.getBytes());
     CiphertextMessage outgoingMessageTwo = aliceSessionCipher.encrypt(originalMessage.getBytes());
 
@@ -278,7 +280,7 @@ public class SessionBuilderTest extends TestCase {
 
     PreKeyWhisperMessage incomingMessage = new PreKeyWhisperMessage(outgoingMessageOne.serialize());
 
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
 
     byte[]        plaintext        = bobSessionCipher.decrypt(incomingMessage);
     assertTrue(originalMessage.equals(new String(plaintext)));
@@ -303,7 +305,7 @@ public class SessionBuilderTest extends TestCase {
 
   public void testRepeatBundleMessageV3() throws InvalidKeyException, UntrustedIdentityException, InvalidVersionException, InvalidMessageException, InvalidKeyIdException, DuplicateMessageException, LegacyMessageException, NoSessionException {
     AxolotlStore   aliceStore          = new InMemoryAxolotlStore();
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
 
     AxolotlStore bobStore = new InMemoryAxolotlStore();
 
@@ -324,7 +326,7 @@ public class SessionBuilderTest extends TestCase {
     aliceSessionBuilder.process(bobPreKey);
 
     String            originalMessage    = "L'homme est condamné à être libre";
-    SessionCipher     aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
     CiphertextMessage outgoingMessageOne = aliceSessionCipher.encrypt(originalMessage.getBytes());
     CiphertextMessage outgoingMessageTwo = aliceSessionCipher.encrypt(originalMessage.getBytes());
 
@@ -333,7 +335,7 @@ public class SessionBuilderTest extends TestCase {
 
     PreKeyWhisperMessage incomingMessage = new PreKeyWhisperMessage(outgoingMessageOne.serialize());
 
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
 
     byte[]        plaintext        = bobSessionCipher.decrypt(incomingMessage);
     assertTrue(originalMessage.equals(new String(plaintext)));
@@ -358,7 +360,7 @@ public class SessionBuilderTest extends TestCase {
 
   public void testBadMessageBundle() throws InvalidKeyException, UntrustedIdentityException, InvalidVersionException, InvalidMessageException, DuplicateMessageException, LegacyMessageException, InvalidKeyIdException {
     AxolotlStore   aliceStore          = new InMemoryAxolotlStore();
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
 
     AxolotlStore bobStore = new InMemoryAxolotlStore();
 
@@ -379,7 +381,7 @@ public class SessionBuilderTest extends TestCase {
     aliceSessionBuilder.process(bobPreKey);
 
     String            originalMessage    = "L'homme est condamné à être libre";
-    SessionCipher     aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
     CiphertextMessage outgoingMessageOne = aliceSessionCipher.encrypt(originalMessage.getBytes());
 
     assertTrue(outgoingMessageOne.getType() == CiphertextMessage.PREKEY_TYPE);
@@ -391,7 +393,7 @@ public class SessionBuilderTest extends TestCase {
     badMessage[badMessage.length-10] ^= 0x01;
 
     PreKeyWhisperMessage incomingMessage  = new PreKeyWhisperMessage(badMessage);
-    SessionCipher        bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher        bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
 
     byte[] plaintext = new byte[0];
 
@@ -412,10 +414,10 @@ public class SessionBuilderTest extends TestCase {
 
   public void testBasicKeyExchange() throws InvalidKeyException, LegacyMessageException, InvalidMessageException, DuplicateMessageException, UntrustedIdentityException, StaleKeyExchangeException, InvalidVersionException, NoSessionException {
     AxolotlStore   aliceStore          = new InMemoryAxolotlStore();
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
 
     AxolotlStore   bobStore          = new InMemoryAxolotlStore();
-    SessionBuilder bobSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionBuilder bobSessionBuilder = new SessionBuilder(bobStore, ALICE_ADDRESS);
 
     KeyExchangeMessage aliceKeyExchangeMessage      = aliceSessionBuilder.process();
     assertTrue(aliceKeyExchangeMessage != null);
@@ -435,7 +437,7 @@ public class SessionBuilderTest extends TestCase {
     runInteraction(aliceStore, bobStore);
 
     aliceStore              = new InMemoryAxolotlStore();
-    aliceSessionBuilder     = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    aliceSessionBuilder     = new SessionBuilder(aliceStore, BOB_ADDRESS);
     aliceKeyExchangeMessage = aliceSessionBuilder.process();
 
     try {
@@ -454,10 +456,10 @@ public class SessionBuilderTest extends TestCase {
   public void testSimultaneousKeyExchange()
       throws InvalidKeyException, DuplicateMessageException, LegacyMessageException, InvalidMessageException, UntrustedIdentityException, StaleKeyExchangeException, NoSessionException {
     AxolotlStore   aliceStore          = new InMemoryAxolotlStore();
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
 
     AxolotlStore   bobStore          = new InMemoryAxolotlStore();
-    SessionBuilder bobSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionBuilder bobSessionBuilder = new SessionBuilder(bobStore, ALICE_ADDRESS);
 
     KeyExchangeMessage aliceKeyExchange = aliceSessionBuilder.process();
     KeyExchangeMessage bobKeyExchange   = bobSessionBuilder.process();
@@ -485,7 +487,7 @@ public class SessionBuilderTest extends TestCase {
 
   public void testOptionalOneTimePreKey() throws Exception {
     AxolotlStore   aliceStore          = new InMemoryAxolotlStore();
-    SessionBuilder aliceSessionBuilder = new SessionBuilder(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionBuilder aliceSessionBuilder = new SessionBuilder(aliceStore, BOB_ADDRESS);
 
     AxolotlStore bobStore = new InMemoryAxolotlStore();
 
@@ -507,7 +509,7 @@ public class SessionBuilderTest extends TestCase {
     assertTrue(aliceStore.loadSession(BOB_ADDRESS).getSessionState().getSessionVersion() == 3);
 
     String            originalMessage    = "L'homme est condamné à être libre";
-    SessionCipher     aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
+    SessionCipher     aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
     CiphertextMessage outgoingMessage    = aliceSessionCipher.encrypt(originalMessage.getBytes());
 
     assertTrue(outgoingMessage.getType() == CiphertextMessage.PREKEY_TYPE);
@@ -518,7 +520,7 @@ public class SessionBuilderTest extends TestCase {
     bobStore.storePreKey(31337, new PreKeyRecord(bobPreKey.getPreKeyId(), bobPreKeyPair));
     bobStore.storeSignedPreKey(22, new SignedPreKeyRecord(22, System.currentTimeMillis(), bobSignedPreKeyPair, bobSignedPreKeySignature));
 
-    SessionCipher bobSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher bobSessionCipher = new SessionCipher(bobStore, ALICE_ADDRESS);
     byte[]        plaintext        = bobSessionCipher.decrypt(incomingMessage);
 
     assertTrue(bobStore.containsSession(ALICE_ADDRESS));
@@ -531,8 +533,8 @@ public class SessionBuilderTest extends TestCase {
   private void runInteraction(AxolotlStore aliceStore, AxolotlStore bobStore)
       throws DuplicateMessageException, LegacyMessageException, InvalidMessageException, NoSessionException
   {
-    SessionCipher aliceSessionCipher = new SessionCipher(new FakeSecureRandomProvider(), aliceStore, BOB_ADDRESS);
-    SessionCipher bobSessionCipher   = new SessionCipher(new FakeSecureRandomProvider(), bobStore, ALICE_ADDRESS);
+    SessionCipher aliceSessionCipher = new SessionCipher(aliceStore, BOB_ADDRESS);
+    SessionCipher bobSessionCipher   = new SessionCipher(bobStore, ALICE_ADDRESS);
 
     String originalMessage = "smert ze smert";
     CiphertextMessage aliceMessage = aliceSessionCipher.encrypt(originalMessage.getBytes());

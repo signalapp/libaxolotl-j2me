@@ -2,6 +2,7 @@ package org.whispersystems.libaxolotl.ratchet;
 
 
 import junit.framework.TestCase;
+import org.whispersystems.libaxolotl.AxolotlBaseTestCase;
 import org.whispersystems.libaxolotl.IdentityKey;
 import org.whispersystems.libaxolotl.IdentityKeyPair;
 import org.whispersystems.libaxolotl.InvalidKeyException;
@@ -16,7 +17,7 @@ import org.whispersystems.libaxolotl.util.guava.Optional;
 
 
 
-public class RatchetingSessionTest extends TestCase {
+public class RatchetingSessionTest extends AxolotlBaseTestCase {
 
   public RatchetingSessionTest(String name) {
     super(name);

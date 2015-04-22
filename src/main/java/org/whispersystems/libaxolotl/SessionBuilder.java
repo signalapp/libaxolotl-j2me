@@ -5,6 +5,7 @@ import org.whispersystems.curve25519.SecureRandomProvider;
 import org.whispersystems.libaxolotl.ecc.Curve;
 import org.whispersystems.libaxolotl.ecc.ECKeyPair;
 import org.whispersystems.libaxolotl.ecc.ECPublicKey;
+import org.whispersystems.libaxolotl.j2me.jce.JmeSecurity;
 import org.whispersystems.libaxolotl.logging.Log;
 import org.whispersystems.libaxolotl.protocol.CiphertextMessage;
 import org.whispersystems.libaxolotl.protocol.KeyExchangeMessage;
@@ -62,19 +63,18 @@ public class SessionBuilder {
    * @param identityKeyStore The {@link org.whispersystems.libaxolotl.state.IdentityKeyStore} containing the client's identity key information.
    * @param remoteAddress The address of the remote user to build a session with.
    */
-  public SessionBuilder(SecureRandomProvider secureRandomProvider,
-                        SessionStore sessionStore,
+  public SessionBuilder(SessionStore sessionStore,
                         PreKeyStore preKeyStore,
                         SignedPreKeyStore signedPreKeyStore,
                         IdentityKeyStore identityKeyStore,
                         AxolotlAddress remoteAddress)
   {
-    this.secureRandomProvider = secureRandomProvider;
     this.sessionStore         = sessionStore;
     this.preKeyStore          = preKeyStore;
     this.signedPreKeyStore    = signedPreKeyStore;
     this.identityKeyStore     = identityKeyStore;
     this.remoteAddress        = remoteAddress;
+    this.secureRandomProvider = JmeSecurity.getProvider().createSecureRandom();
   }
 
   /**
@@ -82,8 +82,8 @@ public class SessionBuilder {
    * @param store The {@link org.whispersystems.libaxolotl.state.AxolotlStore} to store all state information in.
    * @param remoteAddress The address of the remote user to build a session with.
    */
-  public SessionBuilder(SecureRandomProvider secureRandomProvider, AxolotlStore store, AxolotlAddress remoteAddress) {
-    this(secureRandomProvider, store, store, store, store, remoteAddress);
+  public SessionBuilder(AxolotlStore store, AxolotlAddress remoteAddress) {
+    this(store, store, store, store, remoteAddress);
   }
 
   /**

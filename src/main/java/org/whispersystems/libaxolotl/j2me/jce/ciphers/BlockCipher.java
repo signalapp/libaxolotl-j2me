@@ -1,4 +1,6 @@
-package org.whispersystems.libaxolotl.j2me;
+package org.whispersystems.libaxolotl.j2me.jce.ciphers;
+
+import org.whispersystems.libaxolotl.j2me.NestedException;
 
 /**
  * Interface that implements a buffered block cipher.
