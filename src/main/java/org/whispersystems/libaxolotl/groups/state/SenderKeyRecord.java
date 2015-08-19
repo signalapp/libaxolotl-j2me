@@ -36,6 +36,8 @@ public class SenderKeyRecord {
   // SenderKeyState
   private Vector senderKeyStates = new Vector();
 
+  private static final int MAX_STATES = 5;
+
   public SenderKeyRecord() {}
 
   public SenderKeyRecord(byte[] serialized) throws IOException {
@@ -71,6 +73,10 @@ public class SenderKeyRecord {
 
   public void addSenderKeyState(int id, int iteration, byte[] chainKey, ECPublicKey signatureKey) {
     senderKeyStates.addElement(new SenderKeyState(id, iteration, chainKey, signatureKey));
+
+    if (senderKeyStates.size() > MAX_STATES) {
+      senderKeyStates.removeElementAt(0);
+    }
   }
 
   public void setSenderKeyState(int id, int iteration, byte[] chainKey, ECKeyPair signatureKey) {

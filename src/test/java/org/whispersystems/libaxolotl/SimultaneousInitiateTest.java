@@ -34,7 +34,7 @@ public class SimultaneousInitiateTest extends AxolotlBaseTestCase {
   public SimultaneousInitiateTest(String name) {
     super(name);
   }
-  
+
   public void testBasicSimultaneousInitiate()
       throws InvalidKeyException, UntrustedIdentityException, InvalidVersionException,
       InvalidMessageException, DuplicateMessageException, LegacyMessageException,

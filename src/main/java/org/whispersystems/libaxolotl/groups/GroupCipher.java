@@ -17,6 +17,7 @@
 
 package org.whispersystems.libaxolotl.groups;
 
+import org.whispersystems.libaxolotl.DecryptionCallback;
 import org.whispersystems.libaxolotl.DuplicateMessageException;
 import org.whispersystems.libaxolotl.InvalidKeyException;
 import org.whispersystems.libaxolotl.InvalidKeyIdException;
@@ -89,12 +90,41 @@ public class GroupCipher {
     }
   }
 
+
   public byte[] decrypt(byte[] senderKeyMessageBytes)
-      throws LegacyMessageException, InvalidMessageException, DuplicateMessageException
+      throws LegacyMessageException, DuplicateMessageException,
+             InvalidMessageException, NoSessionException
+  {
+    return decrypt(senderKeyMessageBytes, new NullDecryptionCallback());
+  }
+
+  /**
+   * Decrypt a SenderKey group message.
+   *
+   * @param senderKeyMessageBytes The received ciphertext.
+   * @param callback   A callback that is triggered after decryption is complete,
+   *                    but before the updated session state has been committed to the session
+   *                    DB.  This allows some implementations to store the committed plaintext
+   *                    to a DB first, in case they are concerned with a crash happening between
+   *                    the time the session state is updated but before they're able to store
+   *                    the plaintext to disk.
+   * @return Plaintext
+   * @throws LegacyMessageException
+   * @throws InvalidMessageException
+   * @throws DuplicateMessageException
+   */
+  public byte[] decrypt(byte[] senderKeyMessageBytes, DecryptionCallback callback)
+
+      throws LegacyMessageException, InvalidMessageException, DuplicateMessageException, NoSessionException
   {
     synchronized (LOCK) {
       try {
-        SenderKeyRecord  record           = senderKeyStore.loadSenderKey(senderKeyId);
+        SenderKeyRecord record = senderKeyStore.loadSenderKey(senderKeyId);
+
+        if (record.isEmpty()) {
+          throw new NoSessionException("No sender key for: " + senderKeyId);
+        }
+
         SenderKeyMessage senderKeyMessage = new SenderKeyMessage(senderKeyMessageBytes);
         SenderKeyState   senderKeyState   = record.getSenderKeyState(senderKeyMessage.getKeyId());
 
@@ -102,6 +132,8 @@ public class GroupCipher {
 
         SenderMessageKey senderKey = getSenderKey(senderKeyState, senderKeyMessage.getIteration());
         byte[] plaintext = getPlainText(senderKey.getIv(), senderKey.getCipherKey(), senderKeyMessage.getCipherText());
+
+        callback.handlePlaintext(plaintext);
 
         senderKeyStore.storeSenderKey(senderKeyId, record);
 
@@ -128,7 +160,7 @@ public class GroupCipher {
       }
     }
 
-    if (senderChainKey.getIteration() - iteration > 2000) {
+    if (iteration - senderChainKey.getIteration() > 2000) {
       throw new InvalidMessageException("Over 2000 messages into the future!");
     }
 
@@ -179,5 +211,11 @@ public class GroupCipher {
       return buffer;
     }
   }
+
+  private static class NullDecryptionCallback implements DecryptionCallback {
+//    @Override
+    public void handlePlaintext(byte[] plaintext) {}
+  }
+
 
 }
