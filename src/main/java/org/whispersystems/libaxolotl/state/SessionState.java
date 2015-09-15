@@ -41,6 +41,8 @@ import java.util.Vector;
 
 public class SessionState {
 
+  private static final int MAX_MESSAGE_KEYS = 2000;
+
   private SessionStructure sessionStructure;
 
   public SessionState() {
@@ -298,6 +300,10 @@ public class SessionState {
     messageKeyStructure.setIv(messageKeys.getIv().getIV());
 
     chain.addMessagekeys(messageKeyStructure);
+
+    if (chain.getMessagekeysCount() > MAX_MESSAGE_KEYS) {
+      chain.getMessagekeysVector().removeElementAt(0);
+    }
 //    this.sessionStructure.setR
 //
 //    this.sessionStructure = this.sessionStructure.toBuilder()

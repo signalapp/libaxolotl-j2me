@@ -35,6 +35,8 @@ import java.util.Vector;
  */
 public class SenderKeyState {
 
+  private static final int MAX_MESSAGE_KEYS = 2000;
+
   private SenderKeyStateStructure senderKeyStateStructure;
 
   public SenderKeyState(int id, int iteration, byte[] chainKey, ECPublicKey signatureKey) {
@@ -120,6 +122,11 @@ public class SenderKeyState {
     senderMessageKeyStructure.setSeed(senderMessageKey.getSeed());
 
     this.senderKeyStateStructure.addSendermessagekeys(senderMessageKeyStructure);
+
+    if (this.senderKeyStateStructure.getSendermessagekeysCount() > MAX_MESSAGE_KEYS) {
+      this.senderKeyStateStructure.getSendermessagekeysVector().removeElementAt(0);
+    }
+
 //
 //    this.senderKeyStateStructure = this.senderKeyStateStructure.toBuilder()
 //                                                               .addSenderMessageKeys(senderMessageKeyStructure)
